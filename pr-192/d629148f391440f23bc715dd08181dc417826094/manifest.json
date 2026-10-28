@@ -1,0 +1,2639 @@
+{
+  "pr": 192,
+  "base_sha": "57960fad7320fbf58b3c4bac1a8c67e2417a2fa3",
+  "head_sha": "d629148f391440f23bc715dd08181dc417826094",
+  "generated": "2026-10-25T15:48:13Z",
+  "counts": {
+    "changed": 329,
+    "added": 0,
+    "removed": 0,
+    "unchanged": 248
+  },
+  "images": [
+    {
+      "geometry": "128x64",
+      "color": "mono",
+      "image": "compare/128x64-1.png",
+      "rows": 8,
+      "screens": [
+        "caller_actions",
+        "channel",
+        "channel_changed",
+        "channel_contact",
+        "channel_discard",
+        "channel_name",
+        "channel_new",
+        "channel_power"
+      ]
+    },
+    {
+      "geometry": "128x64",
+      "color": "mono",
+      "image": "compare/128x64-2.png",
+      "rows": 8,
+      "screens": [
+        "channel_rx_entry",
+        "channels",
+        "compose",
+        "contact_actions",
+        "contacts",
+        "contacts_find",
+        "crash_log",
+        "crash_prompt"
+      ]
+    },
+    {
+      "geometry": "128x64",
+      "color": "mono",
+      "image": "compare/128x64-3.png",
+      "rows": 8,
+      "screens": [
+        "crash_send_to",
+        "dual_actions",
+        "dual_pick",
+        "dual_zones",
+        "emergency",
+        "factory_reset",
+        "hotspot",
+        "hotspot_info"
+      ]
+    },
+    {
+      "geometry": "128x64",
+      "color": "mono",
+      "image": "compare/128x64-4.png",
+      "rows": 8,
+      "screens": [
+        "message_view",
+        "messages",
+        "messages_empty",
+        "position",
+        "quick_cc_editor",
+        "quick_dmr",
+        "quick_fm",
+        "quick_fm_squelch"
+      ]
+    },
+    {
+      "geometry": "128x64",
+      "color": "mono",
+      "image": "compare/128x64-5.png",
+      "rows": 8,
+      "screens": [
+        "quick_vfo_cc_editor",
+        "quick_vfo_dmr",
+        "quick_vfo_fm",
+        "recent",
+        "roaming",
+        "rx_group",
+        "rx_private",
+        "scan_actions"
+      ]
+    },
+    {
+      "geometry": "128x64",
+      "color": "mono",
+      "image": "compare/128x64-6.png",
+      "rows": 8,
+      "screens": [
+        "settings",
+        "settings_advanced",
+        "settings_display",
+        "settings_editor",
+        "talk_target_picker",
+        "talk_target_picker_vfo",
+        "tools",
+        "tx"
+      ]
+    },
+    {
+      "geometry": "128x64",
+      "color": "mono",
+      "image": "compare/128x64-7.png",
+      "rows": 8,
+      "screens": [
+        "tx_private",
+        "volume",
+        "volume_muted",
+        "zone_actions",
+        "zone_add",
+        "zone_channels",
+        "zone_delete",
+        "zone_options"
+      ]
+    },
+    {
+      "geometry": "128x64",
+      "color": "mono",
+      "image": "compare/128x64-8.png",
+      "rows": 1,
+      "screens": [
+        "zones"
+      ]
+    },
+    {
+      "geometry": "160x128",
+      "color": "color",
+      "image": "compare/160x128-1.png",
+      "rows": 8,
+      "screens": [
+        "caller_actions",
+        "channel",
+        "channel_changed",
+        "channel_contact",
+        "channel_discard",
+        "channel_name",
+        "channel_new",
+        "channel_power"
+      ]
+    },
+    {
+      "geometry": "160x128",
+      "color": "color",
+      "image": "compare/160x128-2.png",
+      "rows": 7,
+      "screens": [
+        "channel_rx_entry",
+        "channels",
+        "channels__red",
+        "channels__yellow",
+        "channels__light_blue",
+        "channels__light",
+        "channels__high_contrast",
+        "compose",
+        "contact_actions",
+        "contacts",
+        "contacts_find",
+        "crash_log"
+      ]
+    },
+    {
+      "geometry": "160x128",
+      "color": "color",
+      "image": "compare/160x128-3.png",
+      "rows": 8,
+      "screens": [
+        "crash_prompt",
+        "crash_send_to",
+        "dual_actions",
+        "dual_pick",
+        "dual_zones",
+        "emergency",
+        "factory_reset",
+        "hotspot"
+      ]
+    },
+    {
+      "geometry": "160x128",
+      "color": "color",
+      "image": "compare/160x128-4.png",
+      "rows": 8,
+      "screens": [
+        "hotspot_info",
+        "message_view",
+        "messages",
+        "messages_empty",
+        "position",
+        "quick_cc_editor",
+        "quick_dmr",
+        "quick_fm"
+      ]
+    },
+    {
+      "geometry": "160x128",
+      "color": "color",
+      "image": "compare/160x128-5.png",
+      "rows": 7,
+      "screens": [
+        "quick_fm_squelch",
+        "quick_vfo_cc_editor",
+        "quick_vfo_dmr",
+        "quick_vfo_fm",
+        "recent",
+        "roaming",
+        "rx_group",
+        "rx_group__light",
+        "rx_group__high_contrast"
+      ]
+    },
+    {
+      "geometry": "160x128",
+      "color": "color",
+      "image": "compare/160x128-6.png",
+      "rows": 7,
+      "screens": [
+        "rx_private",
+        "scan_actions",
+        "settings",
+        "settings_advanced",
+        "settings_display",
+        "settings_display__light",
+        "settings_display__high_contrast",
+        "settings_editor",
+        "talk_target_picker"
+      ]
+    },
+    {
+      "geometry": "160x128",
+      "color": "color",
+      "image": "compare/160x128-7.png",
+      "rows": 7,
+      "screens": [
+        "talk_target_picker_vfo",
+        "tools",
+        "tx",
+        "tx__light",
+        "tx__high_contrast",
+        "tx_private",
+        "volume",
+        "volume_muted",
+        "zone_actions"
+      ]
+    },
+    {
+      "geometry": "160x128",
+      "color": "color",
+      "image": "compare/160x128-8.png",
+      "rows": 5,
+      "screens": [
+        "zone_add",
+        "zone_channels",
+        "zone_delete",
+        "zone_options",
+        "zones"
+      ]
+    },
+    {
+      "geometry": "160x120i5",
+      "color": "color",
+      "image": "compare/160x120i5-1.png",
+      "rows": 8,
+      "screens": [
+        "caller_actions",
+        "channel",
+        "channel_changed",
+        "channel_contact",
+        "channel_discard",
+        "channel_name",
+        "channel_new",
+        "channel_power"
+      ]
+    },
+    {
+      "geometry": "160x120i5",
+      "color": "color",
+      "image": "compare/160x120i5-2.png",
+      "rows": 7,
+      "screens": [
+        "channel_rx_entry",
+        "channels",
+        "channels__red",
+        "channels__yellow",
+        "channels__light_blue",
+        "channels__light",
+        "channels__high_contrast",
+        "compose",
+        "contact_actions",
+        "contacts",
+        "contacts_find",
+        "crash_log"
+      ]
+    },
+    {
+      "geometry": "160x120i5",
+      "color": "color",
+      "image": "compare/160x120i5-3.png",
+      "rows": 8,
+      "screens": [
+        "crash_prompt",
+        "crash_send_to",
+        "dual_actions",
+        "dual_pick",
+        "dual_zones",
+        "emergency",
+        "factory_reset",
+        "hotspot"
+      ]
+    },
+    {
+      "geometry": "160x120i5",
+      "color": "color",
+      "image": "compare/160x120i5-4.png",
+      "rows": 8,
+      "screens": [
+        "hotspot_info",
+        "message_view",
+        "messages",
+        "messages_empty",
+        "position",
+        "quick_cc_editor",
+        "quick_dmr",
+        "quick_fm"
+      ]
+    },
+    {
+      "geometry": "160x120i5",
+      "color": "color",
+      "image": "compare/160x120i5-5.png",
+      "rows": 7,
+      "screens": [
+        "quick_fm_squelch",
+        "quick_vfo_cc_editor",
+        "quick_vfo_dmr",
+        "quick_vfo_fm",
+        "recent",
+        "roaming",
+        "rx_group",
+        "rx_group__light",
+        "rx_group__high_contrast"
+      ]
+    },
+    {
+      "geometry": "160x120i5",
+      "color": "color",
+      "image": "compare/160x120i5-6.png",
+      "rows": 7,
+      "screens": [
+        "rx_private",
+        "scan_actions",
+        "settings",
+        "settings_advanced",
+        "settings_display",
+        "settings_display__light",
+        "settings_display__high_contrast",
+        "settings_editor",
+        "talk_target_picker"
+      ]
+    },
+    {
+      "geometry": "160x120i5",
+      "color": "color",
+      "image": "compare/160x120i5-7.png",
+      "rows": 7,
+      "screens": [
+        "talk_target_picker_vfo",
+        "tools",
+        "tx",
+        "tx__light",
+        "tx__high_contrast",
+        "tx_private",
+        "volume",
+        "volume_muted",
+        "zone_actions"
+      ]
+    },
+    {
+      "geometry": "160x120i5",
+      "color": "color",
+      "image": "compare/160x120i5-8.png",
+      "rows": 5,
+      "screens": [
+        "zone_add",
+        "zone_channels",
+        "zone_delete",
+        "zone_options",
+        "zones"
+      ]
+    },
+    {
+      "geometry": "240x320",
+      "color": "color",
+      "image": "compare/240x320-1.png",
+      "rows": 8,
+      "screens": [
+        "caller_actions",
+        "channel",
+        "channel_changed",
+        "channel_contact",
+        "channel_discard",
+        "channel_name",
+        "channel_new",
+        "channel_power"
+      ]
+    },
+    {
+      "geometry": "240x320",
+      "color": "color",
+      "image": "compare/240x320-2.png",
+      "rows": 7,
+      "screens": [
+        "channel_rx_entry",
+        "channels",
+        "channels__red",
+        "channels__yellow",
+        "channels__light_blue",
+        "channels__light",
+        "channels__high_contrast",
+        "compose",
+        "contact_actions",
+        "contacts",
+        "contacts_find",
+        "crash_log"
+      ]
+    },
+    {
+      "geometry": "240x320",
+      "color": "color",
+      "image": "compare/240x320-3.png",
+      "rows": 8,
+      "screens": [
+        "crash_prompt",
+        "crash_send_to",
+        "dual_actions",
+        "dual_pick",
+        "dual_zones",
+        "emergency",
+        "factory_reset",
+        "hotspot"
+      ]
+    },
+    {
+      "geometry": "240x320",
+      "color": "color",
+      "image": "compare/240x320-4.png",
+      "rows": 8,
+      "screens": [
+        "hotspot_info",
+        "message_view",
+        "messages",
+        "messages_empty",
+        "position",
+        "quick_cc_editor",
+        "quick_dmr",
+        "quick_fm"
+      ]
+    },
+    {
+      "geometry": "240x320",
+      "color": "color",
+      "image": "compare/240x320-5.png",
+      "rows": 7,
+      "screens": [
+        "quick_fm_squelch",
+        "quick_vfo_cc_editor",
+        "quick_vfo_dmr",
+        "quick_vfo_fm",
+        "recent",
+        "roaming",
+        "rx_group",
+        "rx_group__light",
+        "rx_group__high_contrast"
+      ]
+    },
+    {
+      "geometry": "240x320",
+      "color": "color",
+      "image": "compare/240x320-6.png",
+      "rows": 7,
+      "screens": [
+        "rx_private",
+        "scan_actions",
+        "settings",
+        "settings_advanced",
+        "settings_display",
+        "settings_display__light",
+        "settings_display__high_contrast",
+        "settings_editor",
+        "talk_target_picker"
+      ]
+    },
+    {
+      "geometry": "240x320",
+      "color": "color",
+      "image": "compare/240x320-7.png",
+      "rows": 7,
+      "screens": [
+        "talk_target_picker_vfo",
+        "tools",
+        "tx",
+        "tx__light",
+        "tx__high_contrast",
+        "tx_private",
+        "volume",
+        "volume_muted",
+        "zone_actions"
+      ]
+    },
+    {
+      "geometry": "240x320",
+      "color": "color",
+      "image": "compare/240x320-8.png",
+      "rows": 5,
+      "screens": [
+        "zone_add",
+        "zone_channels",
+        "zone_delete",
+        "zone_options",
+        "zones"
+      ]
+    },
+    {
+      "geometry": "240x320i10x5",
+      "color": "color",
+      "image": "compare/240x320i10x5-1.png",
+      "rows": 8,
+      "screens": [
+        "caller_actions",
+        "channel",
+        "channel_changed",
+        "channel_contact",
+        "channel_discard",
+        "channel_name",
+        "channel_new",
+        "channel_power"
+      ]
+    },
+    {
+      "geometry": "240x320i10x5",
+      "color": "color",
+      "image": "compare/240x320i10x5-2.png",
+      "rows": 7,
+      "screens": [
+        "channel_rx_entry",
+        "channels",
+        "channels__red",
+        "channels__yellow",
+        "channels__light_blue",
+        "channels__light",
+        "channels__high_contrast",
+        "compose",
+        "contact_actions",
+        "contacts",
+        "contacts_find",
+        "crash_log"
+      ]
+    },
+    {
+      "geometry": "240x320i10x5",
+      "color": "color",
+      "image": "compare/240x320i10x5-3.png",
+      "rows": 8,
+      "screens": [
+        "crash_prompt",
+        "crash_send_to",
+        "dual_actions",
+        "dual_pick",
+        "dual_zones",
+        "emergency",
+        "factory_reset",
+        "hotspot"
+      ]
+    },
+    {
+      "geometry": "240x320i10x5",
+      "color": "color",
+      "image": "compare/240x320i10x5-4.png",
+      "rows": 8,
+      "screens": [
+        "hotspot_info",
+        "message_view",
+        "messages",
+        "messages_empty",
+        "position",
+        "quick_cc_editor",
+        "quick_dmr",
+        "quick_fm"
+      ]
+    },
+    {
+      "geometry": "240x320i10x5",
+      "color": "color",
+      "image": "compare/240x320i10x5-5.png",
+      "rows": 7,
+      "screens": [
+        "quick_fm_squelch",
+        "quick_vfo_cc_editor",
+        "quick_vfo_dmr",
+        "quick_vfo_fm",
+        "recent",
+        "roaming",
+        "rx_group",
+        "rx_group__light",
+        "rx_group__high_contrast"
+      ]
+    },
+    {
+      "geometry": "240x320i10x5",
+      "color": "color",
+      "image": "compare/240x320i10x5-6.png",
+      "rows": 7,
+      "screens": [
+        "rx_private",
+        "scan_actions",
+        "settings",
+        "settings_advanced",
+        "settings_display",
+        "settings_display__light",
+        "settings_display__high_contrast",
+        "settings_editor",
+        "talk_target_picker"
+      ]
+    },
+    {
+      "geometry": "240x320i10x5",
+      "color": "color",
+      "image": "compare/240x320i10x5-7.png",
+      "rows": 7,
+      "screens": [
+        "talk_target_picker_vfo",
+        "tools",
+        "tx",
+        "tx__light",
+        "tx__high_contrast",
+        "tx_private",
+        "volume",
+        "volume_muted",
+        "zone_actions"
+      ]
+    },
+    {
+      "geometry": "240x320i10x5",
+      "color": "color",
+      "image": "compare/240x320i10x5-8.png",
+      "rows": 5,
+      "screens": [
+        "zone_add",
+        "zone_channels",
+        "zone_delete",
+        "zone_options",
+        "zones"
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "geometry": "128x64",
+      "screen": "caller_actions",
+      "status": "changed",
+      "image": "compare/128x64-1.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "channel",
+      "status": "changed",
+      "image": "compare/128x64-1.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "channel_changed",
+      "status": "changed",
+      "image": "compare/128x64-1.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "channel_contact",
+      "status": "changed",
+      "image": "compare/128x64-1.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "channel_discard",
+      "status": "changed",
+      "image": "compare/128x64-1.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "channel_name",
+      "status": "changed",
+      "image": "compare/128x64-1.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "channel_new",
+      "status": "changed",
+      "image": "compare/128x64-1.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "channel_power",
+      "status": "changed",
+      "image": "compare/128x64-1.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "channel_rx_entry",
+      "status": "changed",
+      "image": "compare/128x64-2.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "channels",
+      "status": "changed",
+      "image": "compare/128x64-2.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "compose",
+      "status": "changed",
+      "image": "compare/128x64-2.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "contact_actions",
+      "status": "changed",
+      "image": "compare/128x64-2.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "contacts",
+      "status": "changed",
+      "image": "compare/128x64-2.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "contacts_find",
+      "status": "changed",
+      "image": "compare/128x64-2.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "crash_log",
+      "status": "changed",
+      "image": "compare/128x64-2.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "crash_prompt",
+      "status": "changed",
+      "image": "compare/128x64-2.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "crash_send_to",
+      "status": "changed",
+      "image": "compare/128x64-3.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "dual_actions",
+      "status": "changed",
+      "image": "compare/128x64-3.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "dual_pick",
+      "status": "changed",
+      "image": "compare/128x64-3.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "dual_zones",
+      "status": "changed",
+      "image": "compare/128x64-3.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "emergency",
+      "status": "changed",
+      "image": "compare/128x64-3.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "factory_reset",
+      "status": "changed",
+      "image": "compare/128x64-3.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "hotspot",
+      "status": "changed",
+      "image": "compare/128x64-3.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "hotspot_info",
+      "status": "changed",
+      "image": "compare/128x64-3.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "message_view",
+      "status": "changed",
+      "image": "compare/128x64-4.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "messages",
+      "status": "changed",
+      "image": "compare/128x64-4.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "messages_empty",
+      "status": "changed",
+      "image": "compare/128x64-4.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "position",
+      "status": "changed",
+      "image": "compare/128x64-4.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "quick_cc_editor",
+      "status": "changed",
+      "image": "compare/128x64-4.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "quick_dmr",
+      "status": "changed",
+      "image": "compare/128x64-4.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "quick_fm",
+      "status": "changed",
+      "image": "compare/128x64-4.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "quick_fm_squelch",
+      "status": "changed",
+      "image": "compare/128x64-4.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "quick_vfo_cc_editor",
+      "status": "changed",
+      "image": "compare/128x64-5.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "quick_vfo_dmr",
+      "status": "changed",
+      "image": "compare/128x64-5.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "quick_vfo_fm",
+      "status": "changed",
+      "image": "compare/128x64-5.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "recent",
+      "status": "changed",
+      "image": "compare/128x64-5.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "roaming",
+      "status": "changed",
+      "image": "compare/128x64-5.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "rx_group",
+      "status": "changed",
+      "image": "compare/128x64-5.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "rx_private",
+      "status": "changed",
+      "image": "compare/128x64-5.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "scan_actions",
+      "status": "changed",
+      "image": "compare/128x64-5.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "settings",
+      "status": "changed",
+      "image": "compare/128x64-6.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "settings_advanced",
+      "status": "changed",
+      "image": "compare/128x64-6.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "settings_display",
+      "status": "changed",
+      "image": "compare/128x64-6.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "settings_editor",
+      "status": "changed",
+      "image": "compare/128x64-6.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "talk_target_picker",
+      "status": "changed",
+      "image": "compare/128x64-6.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "talk_target_picker_vfo",
+      "status": "changed",
+      "image": "compare/128x64-6.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "tools",
+      "status": "changed",
+      "image": "compare/128x64-6.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "tx",
+      "status": "changed",
+      "image": "compare/128x64-6.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "tx_private",
+      "status": "changed",
+      "image": "compare/128x64-7.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "volume",
+      "status": "changed",
+      "image": "compare/128x64-7.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "volume_muted",
+      "status": "changed",
+      "image": "compare/128x64-7.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "zone_actions",
+      "status": "changed",
+      "image": "compare/128x64-7.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "zone_add",
+      "status": "changed",
+      "image": "compare/128x64-7.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "zone_channels",
+      "status": "changed",
+      "image": "compare/128x64-7.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "zone_delete",
+      "status": "changed",
+      "image": "compare/128x64-7.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "zone_options",
+      "status": "changed",
+      "image": "compare/128x64-7.png"
+    },
+    {
+      "geometry": "128x64",
+      "screen": "zones",
+      "status": "changed",
+      "image": "compare/128x64-8.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "caller_actions",
+      "status": "changed",
+      "image": "compare/160x128-1.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channel",
+      "status": "changed",
+      "image": "compare/160x128-1.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channel_changed",
+      "status": "changed",
+      "image": "compare/160x128-1.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channel_contact",
+      "status": "changed",
+      "image": "compare/160x128-1.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channel_discard",
+      "status": "changed",
+      "image": "compare/160x128-1.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channel_name",
+      "status": "changed",
+      "image": "compare/160x128-1.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channel_new",
+      "status": "changed",
+      "image": "compare/160x128-1.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channel_power",
+      "status": "changed",
+      "image": "compare/160x128-1.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channel_rx_entry",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channels",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channels__red",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channels__yellow",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channels__light_blue",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channels__light",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "channels__high_contrast",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "compose",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "contact_actions",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "contacts",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "contacts_find",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "crash_log",
+      "status": "changed",
+      "image": "compare/160x128-2.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "crash_prompt",
+      "status": "changed",
+      "image": "compare/160x128-3.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "crash_send_to",
+      "status": "changed",
+      "image": "compare/160x128-3.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "dual_actions",
+      "status": "changed",
+      "image": "compare/160x128-3.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "dual_pick",
+      "status": "changed",
+      "image": "compare/160x128-3.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "dual_zones",
+      "status": "changed",
+      "image": "compare/160x128-3.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "emergency",
+      "status": "changed",
+      "image": "compare/160x128-3.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "factory_reset",
+      "status": "changed",
+      "image": "compare/160x128-3.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "hotspot",
+      "status": "changed",
+      "image": "compare/160x128-3.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "hotspot_info",
+      "status": "changed",
+      "image": "compare/160x128-4.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "message_view",
+      "status": "changed",
+      "image": "compare/160x128-4.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "messages",
+      "status": "changed",
+      "image": "compare/160x128-4.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "messages_empty",
+      "status": "changed",
+      "image": "compare/160x128-4.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "position",
+      "status": "changed",
+      "image": "compare/160x128-4.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "quick_cc_editor",
+      "status": "changed",
+      "image": "compare/160x128-4.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "quick_dmr",
+      "status": "changed",
+      "image": "compare/160x128-4.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "quick_fm",
+      "status": "changed",
+      "image": "compare/160x128-4.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "quick_fm_squelch",
+      "status": "changed",
+      "image": "compare/160x128-5.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "quick_vfo_cc_editor",
+      "status": "changed",
+      "image": "compare/160x128-5.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "quick_vfo_dmr",
+      "status": "changed",
+      "image": "compare/160x128-5.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "quick_vfo_fm",
+      "status": "changed",
+      "image": "compare/160x128-5.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "recent",
+      "status": "changed",
+      "image": "compare/160x128-5.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "roaming",
+      "status": "changed",
+      "image": "compare/160x128-5.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "rx_group",
+      "status": "changed",
+      "image": "compare/160x128-5.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "rx_group__light",
+      "status": "changed",
+      "image": "compare/160x128-5.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "rx_group__high_contrast",
+      "status": "changed",
+      "image": "compare/160x128-5.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "rx_private",
+      "status": "changed",
+      "image": "compare/160x128-6.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "scan_actions",
+      "status": "changed",
+      "image": "compare/160x128-6.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "settings",
+      "status": "changed",
+      "image": "compare/160x128-6.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "settings_advanced",
+      "status": "changed",
+      "image": "compare/160x128-6.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "settings_display",
+      "status": "changed",
+      "image": "compare/160x128-6.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "settings_display__light",
+      "status": "changed",
+      "image": "compare/160x128-6.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "settings_display__high_contrast",
+      "status": "changed",
+      "image": "compare/160x128-6.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "settings_editor",
+      "status": "changed",
+      "image": "compare/160x128-6.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "talk_target_picker",
+      "status": "changed",
+      "image": "compare/160x128-6.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "talk_target_picker_vfo",
+      "status": "changed",
+      "image": "compare/160x128-7.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "tools",
+      "status": "changed",
+      "image": "compare/160x128-7.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "tx",
+      "status": "changed",
+      "image": "compare/160x128-7.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "tx__light",
+      "status": "changed",
+      "image": "compare/160x128-7.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "tx__high_contrast",
+      "status": "changed",
+      "image": "compare/160x128-7.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "tx_private",
+      "status": "changed",
+      "image": "compare/160x128-7.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "volume",
+      "status": "changed",
+      "image": "compare/160x128-7.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "volume_muted",
+      "status": "changed",
+      "image": "compare/160x128-7.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "zone_actions",
+      "status": "changed",
+      "image": "compare/160x128-7.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "zone_add",
+      "status": "changed",
+      "image": "compare/160x128-8.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "zone_channels",
+      "status": "changed",
+      "image": "compare/160x128-8.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "zone_delete",
+      "status": "changed",
+      "image": "compare/160x128-8.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "zone_options",
+      "status": "changed",
+      "image": "compare/160x128-8.png"
+    },
+    {
+      "geometry": "160x128",
+      "screen": "zones",
+      "status": "changed",
+      "image": "compare/160x128-8.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "caller_actions",
+      "status": "changed",
+      "image": "compare/160x120i5-1.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channel",
+      "status": "changed",
+      "image": "compare/160x120i5-1.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channel_changed",
+      "status": "changed",
+      "image": "compare/160x120i5-1.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channel_contact",
+      "status": "changed",
+      "image": "compare/160x120i5-1.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channel_discard",
+      "status": "changed",
+      "image": "compare/160x120i5-1.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channel_name",
+      "status": "changed",
+      "image": "compare/160x120i5-1.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channel_new",
+      "status": "changed",
+      "image": "compare/160x120i5-1.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channel_power",
+      "status": "changed",
+      "image": "compare/160x120i5-1.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channel_rx_entry",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channels",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channels__red",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channels__yellow",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channels__light_blue",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channels__light",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "channels__high_contrast",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "compose",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "contact_actions",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "contacts",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "contacts_find",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "crash_log",
+      "status": "changed",
+      "image": "compare/160x120i5-2.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "crash_prompt",
+      "status": "changed",
+      "image": "compare/160x120i5-3.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "crash_send_to",
+      "status": "changed",
+      "image": "compare/160x120i5-3.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "dual_actions",
+      "status": "changed",
+      "image": "compare/160x120i5-3.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "dual_pick",
+      "status": "changed",
+      "image": "compare/160x120i5-3.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "dual_zones",
+      "status": "changed",
+      "image": "compare/160x120i5-3.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "emergency",
+      "status": "changed",
+      "image": "compare/160x120i5-3.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "factory_reset",
+      "status": "changed",
+      "image": "compare/160x120i5-3.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "hotspot",
+      "status": "changed",
+      "image": "compare/160x120i5-3.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "hotspot_info",
+      "status": "changed",
+      "image": "compare/160x120i5-4.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "message_view",
+      "status": "changed",
+      "image": "compare/160x120i5-4.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "messages",
+      "status": "changed",
+      "image": "compare/160x120i5-4.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "messages_empty",
+      "status": "changed",
+      "image": "compare/160x120i5-4.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "position",
+      "status": "changed",
+      "image": "compare/160x120i5-4.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "quick_cc_editor",
+      "status": "changed",
+      "image": "compare/160x120i5-4.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "quick_dmr",
+      "status": "changed",
+      "image": "compare/160x120i5-4.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "quick_fm",
+      "status": "changed",
+      "image": "compare/160x120i5-4.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "quick_fm_squelch",
+      "status": "changed",
+      "image": "compare/160x120i5-5.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "quick_vfo_cc_editor",
+      "status": "changed",
+      "image": "compare/160x120i5-5.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "quick_vfo_dmr",
+      "status": "changed",
+      "image": "compare/160x120i5-5.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "quick_vfo_fm",
+      "status": "changed",
+      "image": "compare/160x120i5-5.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "recent",
+      "status": "changed",
+      "image": "compare/160x120i5-5.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "roaming",
+      "status": "changed",
+      "image": "compare/160x120i5-5.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "rx_group",
+      "status": "changed",
+      "image": "compare/160x120i5-5.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "rx_group__light",
+      "status": "changed",
+      "image": "compare/160x120i5-5.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "rx_group__high_contrast",
+      "status": "changed",
+      "image": "compare/160x120i5-5.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "rx_private",
+      "status": "changed",
+      "image": "compare/160x120i5-6.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "scan_actions",
+      "status": "changed",
+      "image": "compare/160x120i5-6.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "settings",
+      "status": "changed",
+      "image": "compare/160x120i5-6.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "settings_advanced",
+      "status": "changed",
+      "image": "compare/160x120i5-6.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "settings_display",
+      "status": "changed",
+      "image": "compare/160x120i5-6.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "settings_display__light",
+      "status": "changed",
+      "image": "compare/160x120i5-6.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "settings_display__high_contrast",
+      "status": "changed",
+      "image": "compare/160x120i5-6.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "settings_editor",
+      "status": "changed",
+      "image": "compare/160x120i5-6.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "talk_target_picker",
+      "status": "changed",
+      "image": "compare/160x120i5-6.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "talk_target_picker_vfo",
+      "status": "changed",
+      "image": "compare/160x120i5-7.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "tools",
+      "status": "changed",
+      "image": "compare/160x120i5-7.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "tx",
+      "status": "changed",
+      "image": "compare/160x120i5-7.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "tx__light",
+      "status": "changed",
+      "image": "compare/160x120i5-7.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "tx__high_contrast",
+      "status": "changed",
+      "image": "compare/160x120i5-7.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "tx_private",
+      "status": "changed",
+      "image": "compare/160x120i5-7.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "volume",
+      "status": "changed",
+      "image": "compare/160x120i5-7.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "volume_muted",
+      "status": "changed",
+      "image": "compare/160x120i5-7.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "zone_actions",
+      "status": "changed",
+      "image": "compare/160x120i5-7.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "zone_add",
+      "status": "changed",
+      "image": "compare/160x120i5-8.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "zone_channels",
+      "status": "changed",
+      "image": "compare/160x120i5-8.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "zone_delete",
+      "status": "changed",
+      "image": "compare/160x120i5-8.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "zone_options",
+      "status": "changed",
+      "image": "compare/160x120i5-8.png"
+    },
+    {
+      "geometry": "160x120i5",
+      "screen": "zones",
+      "status": "changed",
+      "image": "compare/160x120i5-8.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "caller_actions",
+      "status": "changed",
+      "image": "compare/240x320-1.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channel",
+      "status": "changed",
+      "image": "compare/240x320-1.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channel_changed",
+      "status": "changed",
+      "image": "compare/240x320-1.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channel_contact",
+      "status": "changed",
+      "image": "compare/240x320-1.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channel_discard",
+      "status": "changed",
+      "image": "compare/240x320-1.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channel_name",
+      "status": "changed",
+      "image": "compare/240x320-1.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channel_new",
+      "status": "changed",
+      "image": "compare/240x320-1.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channel_power",
+      "status": "changed",
+      "image": "compare/240x320-1.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channel_rx_entry",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channels",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channels__red",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channels__yellow",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channels__light_blue",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channels__light",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "channels__high_contrast",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "compose",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "contact_actions",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "contacts",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "contacts_find",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "crash_log",
+      "status": "changed",
+      "image": "compare/240x320-2.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "crash_prompt",
+      "status": "changed",
+      "image": "compare/240x320-3.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "crash_send_to",
+      "status": "changed",
+      "image": "compare/240x320-3.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "dual_actions",
+      "status": "changed",
+      "image": "compare/240x320-3.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "dual_pick",
+      "status": "changed",
+      "image": "compare/240x320-3.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "dual_zones",
+      "status": "changed",
+      "image": "compare/240x320-3.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "emergency",
+      "status": "changed",
+      "image": "compare/240x320-3.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "factory_reset",
+      "status": "changed",
+      "image": "compare/240x320-3.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "hotspot",
+      "status": "changed",
+      "image": "compare/240x320-3.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "hotspot_info",
+      "status": "changed",
+      "image": "compare/240x320-4.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "message_view",
+      "status": "changed",
+      "image": "compare/240x320-4.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "messages",
+      "status": "changed",
+      "image": "compare/240x320-4.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "messages_empty",
+      "status": "changed",
+      "image": "compare/240x320-4.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "position",
+      "status": "changed",
+      "image": "compare/240x320-4.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "quick_cc_editor",
+      "status": "changed",
+      "image": "compare/240x320-4.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "quick_dmr",
+      "status": "changed",
+      "image": "compare/240x320-4.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "quick_fm",
+      "status": "changed",
+      "image": "compare/240x320-4.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "quick_fm_squelch",
+      "status": "changed",
+      "image": "compare/240x320-5.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "quick_vfo_cc_editor",
+      "status": "changed",
+      "image": "compare/240x320-5.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "quick_vfo_dmr",
+      "status": "changed",
+      "image": "compare/240x320-5.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "quick_vfo_fm",
+      "status": "changed",
+      "image": "compare/240x320-5.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "recent",
+      "status": "changed",
+      "image": "compare/240x320-5.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "roaming",
+      "status": "changed",
+      "image": "compare/240x320-5.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "rx_group",
+      "status": "changed",
+      "image": "compare/240x320-5.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "rx_group__light",
+      "status": "changed",
+      "image": "compare/240x320-5.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "rx_group__high_contrast",
+      "status": "changed",
+      "image": "compare/240x320-5.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "rx_private",
+      "status": "changed",
+      "image": "compare/240x320-6.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "scan_actions",
+      "status": "changed",
+      "image": "compare/240x320-6.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "settings",
+      "status": "changed",
+      "image": "compare/240x320-6.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "settings_advanced",
+      "status": "changed",
+      "image": "compare/240x320-6.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "settings_display",
+      "status": "changed",
+      "image": "compare/240x320-6.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "settings_display__light",
+      "status": "changed",
+      "image": "compare/240x320-6.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "settings_display__high_contrast",
+      "status": "changed",
+      "image": "compare/240x320-6.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "settings_editor",
+      "status": "changed",
+      "image": "compare/240x320-6.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "talk_target_picker",
+      "status": "changed",
+      "image": "compare/240x320-6.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "talk_target_picker_vfo",
+      "status": "changed",
+      "image": "compare/240x320-7.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "tools",
+      "status": "changed",
+      "image": "compare/240x320-7.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "tx",
+      "status": "changed",
+      "image": "compare/240x320-7.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "tx__light",
+      "status": "changed",
+      "image": "compare/240x320-7.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "tx__high_contrast",
+      "status": "changed",
+      "image": "compare/240x320-7.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "tx_private",
+      "status": "changed",
+      "image": "compare/240x320-7.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "volume",
+      "status": "changed",
+      "image": "compare/240x320-7.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "volume_muted",
+      "status": "changed",
+      "image": "compare/240x320-7.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "zone_actions",
+      "status": "changed",
+      "image": "compare/240x320-7.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "zone_add",
+      "status": "changed",
+      "image": "compare/240x320-8.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "zone_channels",
+      "status": "changed",
+      "image": "compare/240x320-8.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "zone_delete",
+      "status": "changed",
+      "image": "compare/240x320-8.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "zone_options",
+      "status": "changed",
+      "image": "compare/240x320-8.png"
+    },
+    {
+      "geometry": "240x320",
+      "screen": "zones",
+      "status": "changed",
+      "image": "compare/240x320-8.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "caller_actions",
+      "status": "changed",
+      "image": "compare/240x320i10x5-1.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channel",
+      "status": "changed",
+      "image": "compare/240x320i10x5-1.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channel_changed",
+      "status": "changed",
+      "image": "compare/240x320i10x5-1.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channel_contact",
+      "status": "changed",
+      "image": "compare/240x320i10x5-1.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channel_discard",
+      "status": "changed",
+      "image": "compare/240x320i10x5-1.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channel_name",
+      "status": "changed",
+      "image": "compare/240x320i10x5-1.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channel_new",
+      "status": "changed",
+      "image": "compare/240x320i10x5-1.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channel_power",
+      "status": "changed",
+      "image": "compare/240x320i10x5-1.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channel_rx_entry",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channels",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channels__red",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channels__yellow",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channels__light_blue",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channels__light",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "channels__high_contrast",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "compose",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "contact_actions",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "contacts",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "contacts_find",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "crash_log",
+      "status": "changed",
+      "image": "compare/240x320i10x5-2.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "crash_prompt",
+      "status": "changed",
+      "image": "compare/240x320i10x5-3.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "crash_send_to",
+      "status": "changed",
+      "image": "compare/240x320i10x5-3.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "dual_actions",
+      "status": "changed",
+      "image": "compare/240x320i10x5-3.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "dual_pick",
+      "status": "changed",
+      "image": "compare/240x320i10x5-3.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "dual_zones",
+      "status": "changed",
+      "image": "compare/240x320i10x5-3.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "emergency",
+      "status": "changed",
+      "image": "compare/240x320i10x5-3.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "factory_reset",
+      "status": "changed",
+      "image": "compare/240x320i10x5-3.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "hotspot",
+      "status": "changed",
+      "image": "compare/240x320i10x5-3.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "hotspot_info",
+      "status": "changed",
+      "image": "compare/240x320i10x5-4.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "message_view",
+      "status": "changed",
+      "image": "compare/240x320i10x5-4.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "messages",
+      "status": "changed",
+      "image": "compare/240x320i10x5-4.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "messages_empty",
+      "status": "changed",
+      "image": "compare/240x320i10x5-4.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "position",
+      "status": "changed",
+      "image": "compare/240x320i10x5-4.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "quick_cc_editor",
+      "status": "changed",
+      "image": "compare/240x320i10x5-4.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "quick_dmr",
+      "status": "changed",
+      "image": "compare/240x320i10x5-4.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "quick_fm",
+      "status": "changed",
+      "image": "compare/240x320i10x5-4.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "quick_fm_squelch",
+      "status": "changed",
+      "image": "compare/240x320i10x5-5.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "quick_vfo_cc_editor",
+      "status": "changed",
+      "image": "compare/240x320i10x5-5.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "quick_vfo_dmr",
+      "status": "changed",
+      "image": "compare/240x320i10x5-5.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "quick_vfo_fm",
+      "status": "changed",
+      "image": "compare/240x320i10x5-5.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "recent",
+      "status": "changed",
+      "image": "compare/240x320i10x5-5.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "roaming",
+      "status": "changed",
+      "image": "compare/240x320i10x5-5.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "rx_group",
+      "status": "changed",
+      "image": "compare/240x320i10x5-5.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "rx_group__light",
+      "status": "changed",
+      "image": "compare/240x320i10x5-5.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "rx_group__high_contrast",
+      "status": "changed",
+      "image": "compare/240x320i10x5-5.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "rx_private",
+      "status": "changed",
+      "image": "compare/240x320i10x5-6.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "scan_actions",
+      "status": "changed",
+      "image": "compare/240x320i10x5-6.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "settings",
+      "status": "changed",
+      "image": "compare/240x320i10x5-6.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "settings_advanced",
+      "status": "changed",
+      "image": "compare/240x320i10x5-6.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "settings_display",
+      "status": "changed",
+      "image": "compare/240x320i10x5-6.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "settings_display__light",
+      "status": "changed",
+      "image": "compare/240x320i10x5-6.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "settings_display__high_contrast",
+      "status": "changed",
+      "image": "compare/240x320i10x5-6.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "settings_editor",
+      "status": "changed",
+      "image": "compare/240x320i10x5-6.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "talk_target_picker",
+      "status": "changed",
+      "image": "compare/240x320i10x5-6.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "talk_target_picker_vfo",
+      "status": "changed",
+      "image": "compare/240x320i10x5-7.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "tools",
+      "status": "changed",
+      "image": "compare/240x320i10x5-7.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "tx",
+      "status": "changed",
+      "image": "compare/240x320i10x5-7.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "tx__light",
+      "status": "changed",
+      "image": "compare/240x320i10x5-7.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "tx__high_contrast",
+      "status": "changed",
+      "image": "compare/240x320i10x5-7.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "tx_private",
+      "status": "changed",
+      "image": "compare/240x320i10x5-7.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "volume",
+      "status": "changed",
+      "image": "compare/240x320i10x5-7.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "volume_muted",
+      "status": "changed",
+      "image": "compare/240x320i10x5-7.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "zone_actions",
+      "status": "changed",
+      "image": "compare/240x320i10x5-7.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "zone_add",
+      "status": "changed",
+      "image": "compare/240x320i10x5-8.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "zone_channels",
+      "status": "changed",
+      "image": "compare/240x320i10x5-8.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "zone_delete",
+      "status": "changed",
+      "image": "compare/240x320i10x5-8.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "zone_options",
+      "status": "changed",
+      "image": "compare/240x320i10x5-8.png"
+    },
+    {
+      "geometry": "240x320i10x5",
+      "screen": "zones",
+      "status": "changed",
+      "image": "compare/240x320i10x5-8.png"
+    }
+  ]
+}
