@@ -48,7 +48,20 @@ Before it tunes, when the selected channel changed, it switches two pins by the 
 | A (chip 1, 0x2E) | 1 | 0 |
 | B (chip 0, 0x71) | 0 | 1 |
 
-So PD8 / PD9 route one receiver into a shared path: the speaker audio or the HR_C6000's input for DMR (?: R1, R2).
+### 2.3 The receivers' audio: PD9 for A, PD8 for B
+
+PD9 and PD8 are not a one-of-two switch: the image drives all four combinations. Each connects one receiver's audio
+to a shared line (inferred: the line the HR_C6000 and the audio path take, as on the MD-UV380 family), PD9 receiver
+A (chip 1), PD8 receiver B (chip 0) (image):
+
+| Routine | What it does |
+|---|---|
+| unmute (0x08060912, takes the chip) | the chip's audio registers (0x41, 0x44 = 0xFF), then the chip's switch on: an analog channel (the TYT codeplug's type 1) turns on PD9 for A or PD8 for B, the other switch as it was |
+| digital (0x0806077A, takes the chip) | a digital channel (type 2): the chip's switch on and the other's off (A: PD9 = 1, PD8 = 0; B: PD8 = 1, PD9 = 0) |
+| retune (2.1) | when the selected side changes: its switch on, the other off |
+
+So in FM both receivers can be heard at once (both switches on); in DMR only one receiver feeds the line, since the one
+HR_C6000 decodes one signal (inferred from the switch levels; what is heard is checked on the radio).
 On the MD-UV380 PD9 is the RX audio mux and PD8 the LCD backlight; on the MD-2017 PD8 is this switch, so the backlight
 is on another pin (?: R4). The same routine writes PC4, PC5 and PC6 low (PC6 is the PA band select on the MD-UV380,
 PC5 in its TX path).
@@ -108,8 +121,8 @@ From every GPIO_Init (mode), GPIO_PinAFConfig (alternate function) and read / wr
 
 | # | Question | How |
 |---|---|---|
-| R1 | How the two receivers' audio reaches the speaker (a mux GPIO, a mixer, both at once) | the image's audio path set-up next to the RX routine's callers |
-| R2 | Which receiver feeds the HR_C6000 for DMR, and whether the second can | the HR_C6000 input set-up; the DMR entry's chip arguments |
+| R1 | ~~The receivers' audio~~: PD9 A, PD8 B, both on in FM (2.3); confirm on the radio | |
+| R2 | ~~DMR input~~: the selected receiver alone, either one (2.3); confirm on the radio | |
 | R3 | ~~Each receiver's band supplies~~: done (2.2) | |
 | R4 | The pins marked (?) in section 3: the backlight, PA13, PA15, PB0-PB2, PB10, PC13, PD10, PD11, PE13, PE15 | the code reading or writing each one; then on the radio |
 | R5 | The codec windows of V4.05 for rfoundry (a profile in `stockfw.PROFILES`) | the first code word 0x4FF0E92D is a common prologue, so it doesn't locate the codec alone. The codec's tables are the MD-UV380 library's, moved: one MD-UV380 vendor file listed in [codec-mduv380.md](codec-mduv380.md) as a reference finds them in V4.05 by content, then the code window by the table island's references; the emulator check of the MD-UV380 pages confirms the windows |
