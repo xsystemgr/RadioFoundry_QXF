@@ -112,7 +112,7 @@ From every GPIO_Init (mode), GPIO_PinAFConfig (alternate function) and read / wr
 | R2 | Which receiver feeds the HR_C6000 for DMR, and whether the second can | the HR_C6000 input set-up; the DMR entry's chip arguments |
 | R3 | ~~Each receiver's band supplies~~: done (2.2) | |
 | R4 | The pins marked (?) in section 3: the backlight, PA13, PA15, PB0-PB2, PB10, PC13, PD10, PD11, PE13, PE15 | the code reading or writing each one; then on the radio |
-| R5 | The codec window of V4.05 for rfoundry | `stockfw` search, as for the MD-UV380 builds |
+| R5 | The codec windows of V4.05 for rfoundry (a profile in `stockfw.PROFILES`) | the first code word 0x4FF0E92D is a common prologue, so it doesn't locate the codec alone. The codec's tables are the MD-UV380 library's, moved: one MD-UV380 vendor file listed in [codec-mduv380.md](codec-mduv380.md) as a reference finds them in V4.05 by content, then the code window by the table island's references; the emulator check of the MD-UV380 pages confirms the windows |
 | R6 | Bootloader entry keys and DFU loader (expected the MD-UV380's: PTT and the top side key at power on) | on the radio |
 
 ## 5. Sources
