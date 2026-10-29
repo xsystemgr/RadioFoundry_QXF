@@ -31,6 +31,28 @@ The image drives **two** AT1846S on one bit-banged I2C bus (image):
 
 The AT1846S has no AM demodulator (airband-and-broadcast.md 2), so this radio has no air band AM.
 
+### 2.1 Tuning the two receivers
+
+One routine (0x0804602C) retunes the receivers (image):
+
+| Mode | What it does |
+|---|---|
+| One receiver | only the selected channel's chip: channel A on chip 1 (0x2E), channel B on chip 0 (0x71); which one is a flag in RAM (0x2001C930 bit 7, 1 = A) |
+| Both | chip 1 with channel A and chip 0 with channel B, each with its own frequency: **true dual receive**, not alternation |
+
+Before it tunes, when the selected channel changed, it switches two pins by the same A/B bit, always to opposite levels
+(GPIO writes through the image's `GPIO_WriteBit`, 0x0803A5CE):
+
+| Selected | PD9 | PD8 |
+|---|---|---|
+| A (chip 1, 0x2E) | 1 | 0 |
+| B (chip 0, 0x71) | 0 | 1 |
+
+So PD8 / PD9 route one receiver into a shared path: the speaker audio or the HR_C6000's input for DMR (?: R1, R2).
+On the MD-UV380 PD9 is the RX audio mux and PD8 the LCD backlight; on the MD-2017 PD8 is this switch, so the backlight
+is on another pin (?: R4). The same routine writes PC4, PC5 and PC6 low (PC6 is the PA band select on the MD-UV380,
+PC5 in its TX path).
+
 ## 3. Open questions (next steps)
 
 | # | Question | How |
