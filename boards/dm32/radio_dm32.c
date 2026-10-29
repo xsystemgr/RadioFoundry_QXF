@@ -78,6 +78,7 @@ static bool r4a_changed;	// 0x4A holds FD_4A_AM_STOCK, r4a_saved what it held be
 static uint16_t r4a_saved;
 static uint8_t am_variant;	// RADIO_AM_MODE_* (am_mode)
 static bool am_en_bit;		// FD_AM_EN_BIT is set in FD_REG_AM_EN
+static bool am_via_c7000;	// AM audio through the HR_C7000 (RADIO_AM_MODE_STOCK_C7000), as APRS listening routes it
 static bool asleep;		// the receiver is powered down between listen windows (rx_sleep)
 static bool aprs_listen;	// APRS takes the HR_C7000's FM audio (aprs_listen_route)
 static bool afsk_tx;		// APRS tones play through the prompt FIFO into the modulator (afsk_tx_route)
@@ -262,6 +263,7 @@ static void set_mode(radio_mode_t m)
 		mode = RADIO_MODE_FM;
 	}
 	rx_am_on = false;	// both mode tables write the FM AF word
+	am_via_c7000 = false;
 	af_word = FD6818_AF_FM;
 	agc_word = mode == RADIO_MODE_DMR ? 0xB03Fu : FD_AGC_AUTO;	// and their own AGC and gain words
 	gain_word = FD_GAIN_FM;
@@ -291,7 +293,9 @@ static bool rx_tune(uint32_t hz, radio_bw_t bw, const subtone_t *tone, bool am)
 		fd6818_set_bandwidth(&fd, FD6818_BW_DMR);
 		fd6818_set_state(&fd, FD6818_STATE_RX);
 	} else {
-		bool stock = am && am_variant == RADIO_AM_MODE_STOCK;
+		bool stock = am && (am_variant == RADIO_AM_MODE_STOCK || am_variant == RADIO_AM_MODE_STOCK_C7000 ||
+				    am_variant == RADIO_AM_MODE_STOCK_AF0740);
+		am_via_c7000 = am && am_variant == RADIO_AM_MODE_STOCK_C7000;
 		fd6818_set_bandwidth(&fd, stock ? FD_BW_AM_STOCK : fm_bw_reg(slope ? RADIO_BW_25K : bw));
 		fd6818_set_state(&fd, FD6818_STATE_RX);
 		hrc_dac_b_power(false);
@@ -306,7 +310,8 @@ static bool rx_tune(uint32_t hz, radio_bw_t bw, const subtone_t *tone, bool am)
 			fd6818_write(&fd, FD_REG_AM_EN, enable_bit ? (uint16_t)(r | FD_AM_EN_BIT) : (uint16_t)(r & ~FD_AM_EN_BIT));
 			am_en_bit = enable_bit;
 		}
-		uint16_t af = stock ? FD_AF_AM_STOCK : am && !slope && !enable_bit ? FD6818_AF_AM : FD6818_AF_FM;
+		uint16_t af = stock ? (am_variant == RADIO_AM_MODE_STOCK_AF0740 ? FD6818_AF_AM : FD_AF_AM_STOCK) :
+			      am && !slope && !enable_bit ? FD6818_AF_AM : FD6818_AF_FM;
 		if (af != af_word) {
 			fd6818_write(&fd, FD6818_REG_AF, af);
 			af_word = af;
@@ -500,13 +505,14 @@ static void speaker_source(void)
 {
 	// The FD6818's output is squelched noise while the squelch is closed: the speaker listens to it only while it is open
 	bool fm_open = mode == RADIO_MODE_FM && !transmitting && !pcm_on && rx_audio;
-	bool analog = fm_open && !aprs_listen;
+	bool via_c7000 = aprs_listen || (am_via_c7000 && rx_am_on);
+	bool analog = fm_open && !via_c7000;
 	hrc_pin_write(PIN_SPK_SOURCE, analog);
 	if (!transmitting) {
 		hrc_pin_write(PIN_MIC_PATH, !analog);
 	}
 	if (mode == RADIO_MODE_FM && !transmitting) {
-		bool play = fm_open && aprs_listen;
+		bool play = fm_open && via_c7000;
 		uint32_t s = hrc_irq_save();	// the AUDIO_CONTROL shadow is shared with the audio task
 		hrc7000_audio_bits(&modem, play ? C7_AUDIO_FM_PLAY : 0, play ? 0 : C7_AUDIO_FM_PLAY);
 		hrc_irq_restore(s);

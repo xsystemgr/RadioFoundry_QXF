@@ -20,7 +20,9 @@ typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR } radio_mode_t;
 #define RADIO_AM_MODE_AGC_MID		3u
 #define RADIO_AM_MODE_SLOPE		4u
 #define RADIO_AM_MODE_ENABLE_BIT	5u
-#define RADIO_AM_MODE_COUNT		6u
+#define RADIO_AM_MODE_STOCK_C7000	6u	// the stock set-up, the audio played through the baseband chip
+#define RADIO_AM_MODE_STOCK_AF0740	7u	// the stock filter, gain and 0x4A with the AF word 0x0740
+#define RADIO_AM_MODE_COUNT		8u
 typedef enum { RADIO_BW_12K5, RADIO_BW_25K } radio_bw_t;
 
 typedef enum { TONE_NONE, TONE_CTCSS, TONE_DCS, TONE_DCS_INV } tone_type_t;

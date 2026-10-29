@@ -79,6 +79,8 @@ and applied at once while AM plays. The row shows only on a board that has the h
 | Setting | What an FD6818 board does |
 |---|---|
 | Baofeng stock (default) | what the radio's own firmware writes for 108-136 MHz (read from its 049 image: a frequency check against those limits, then one set-up routine): the RF filter at its narrowest, 0x43 = 0x0048 (firlpf_bw 1.7 kHz, wb 0); AF output type AM, 0x47 = 0x6740; the receive gain word at its top, 0x13 = 0x03FF; 0x4A = 0x5450. Leaving AM: 0x13 = 0x037E as its FM path does, 0x4A as read before |
+| Stock, AF 0740 | the stock filter, gain and 0x4A with the AF word 0x0740 (the FM word's high bits, which play on the speaker path) |
+| Stock via C7000 | the stock set-up, the audio through the baseband chip as APRS listening routes it (0x2F low, its FM playback on) |
 | AF type only | AF output type AM (0x47 = 0x0740), everything else FM: section 3.3 as first written |
 | AF, AGC high / AGC mid | the same, the AGC fixed at index 3 (0x7E = 0xB02E, as the DMR table's 0xB03F) or index 0 (0x802E) |
 | Slope +1.6k | the FM demodulator 1.6 kHz above the carrier, the 25 kHz filter, the AGC fixed at index 3 |
