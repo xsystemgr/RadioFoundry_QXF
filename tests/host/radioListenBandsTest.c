@@ -316,10 +316,18 @@ static void test_helpers(void)
 	ch.mode = RADIO_MODE_DMR;
 	CHECK(!radio_am_channel(&ch));
 	// The squelch scale: -18 dBm and stronger is 0, every dB weaker adds one
-	CHECK(radio_am_noise(-10) == 0 && radio_am_noise(-18) == 0 && radio_am_noise(-70) == 52);
-	CHECK(radio_am_noise(-400) == 255);
+	CHECK(radio_am_noise(-10, 118100000) == 0 && radio_am_noise(-26, 118100000) == 0 &&
+	      radio_am_noise(-78, 118100000) == 52);
+	CHECK(radio_am_noise(-400, 118100000) == 255);
+	// Level 1: above -90 dBm in the VHF air band (and on AM-flagged channels), above -100 dBm in the UHF one
+	CHECK(radio_am_noise(-89, 118100000) < radio_sm_squelch_open_below(1) &&
+	      !(radio_am_noise(-90, 118100000) < radio_sm_squelch_open_below(1)));
+	CHECK(radio_am_noise(-89, 146520000) == radio_am_noise(-89, 118100000));
+	CHECK(radio_am_noise(-99, 243000000) < radio_sm_squelch_open_below(1) &&
+	      !(radio_am_noise(-100, 243000000) < radio_sm_squelch_open_below(1)));
 	// Level 5 opens above -70 dBm: noise 52 < 52 is false, 51 (-69 dBm) opens
-	CHECK(radio_am_noise(-69) < radio_sm_squelch_open_below(5) && !(radio_am_noise(-70) < radio_sm_squelch_open_below(5)));
+	CHECK(radio_am_noise(-77, 118100000) < radio_sm_squelch_open_below(5) &&
+	      !(radio_am_noise(-78, 118100000) < radio_sm_squelch_open_below(5)));
 	// 8.33 kHz: the exact 25/3 kHz grid, snapping first; other steps add
 	CHECK(radio_am_step(118000000, 1, RADIO_AM_STEP_833) == 118008333);
 	CHECK(radio_am_step(118008333, 1, RADIO_AM_STEP_833) == 118016667);
@@ -371,8 +379,8 @@ static void test_am_channel(void)
 	hw.sig_rssi = -50;
 	run(100);
 	CHECK(sm.view.state == RS_RX && hw.audio);
-	CHECK(sm.view.noise == 32);	// the AM squelch value: -18 - (-50)
-	hw.sig_rssi = -76;	// below level 5's -70 dBm (with its hysteresis)
+	CHECK(sm.view.noise == 24);	// the AM squelch value: -26 - (-50)
+	hw.sig_rssi = -84;	// below level 5's -78 dBm (with its hysteresis)
 	run(100);
 	CHECK(sm.view.state == RS_IDLE && !hw.audio);
 	hw.sig_rssi = -63;

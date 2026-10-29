@@ -20,9 +20,10 @@ bool radio_am_tx_refused(uint32_t hz)
 	return radio_am_capable() && radio_am_band(hz);
 }
 
-uint8_t radio_am_noise(int16_t rssi_dbm)
+uint8_t radio_am_noise(int16_t rssi_dbm, uint32_t hz)
 {
-	int32_t n = RADIO_AM_SQL_REF_DBM - (int32_t)rssi_dbm;
+	int32_t ref = hz >= RADIO_AM_UHF_LO_HZ && hz < RADIO_AM_UHF_HI_HZ ? RADIO_AM_SQL_REF_UHF_DBM : RADIO_AM_SQL_REF_DBM;
+	int32_t n = ref - (int32_t)rssi_dbm;
 	if (n < 0) {
 		return 0;
 	}
