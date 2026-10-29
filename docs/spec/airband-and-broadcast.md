@@ -76,7 +76,7 @@ How the FD6818 demodulates AM is not settled (section 2), so a board may offer s
 `RADIO_AM_MODE_*`), chosen at Settings › Talk › AM demod (`radio_settings_t.am_mode`, stored in `settings_t.rs_am_mode`)
 and applied at once while AM plays. The row shows only on a board that has the hook (`UI_FEAT_AM_MODE`).
 
-| Setting | What the board does (DM-32UV) |
+| Setting | What an FD6818 board does |
 |---|---|
 | AM, auto AGC (default) | AF output type AM (0x47 = 0x0740), the AGC automatic (0x7E = 0x302E): section 3.3 as before |
 | AM, AGC high / AGC mid | the same, the AGC fixed at index 3 (0x7E = 0xB02E, as the DMR table's 0xB03F) or index 0 (0x802E) |
