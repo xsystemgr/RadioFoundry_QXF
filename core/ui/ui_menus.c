@@ -1586,7 +1586,15 @@ static bool ced_changed(uint8_t r)
 		return !tone_same((const subtone_t *)a, (const subtone_t *)b);
 	if (ced_fields[r].bit != 0)
 		return ((*a ^ *b) & ced_fields[r].bit) != 0;
+	if (r == CE_MODE && ced_ch.am != ced_orig.am)
+		return true;	// FM and AM share the mode byte: AM is an FM channel with the AM flag
 	return memcmp(a, b, ced_fields[r].len) != 0;
+}
+
+// The channel's Mode row offers AM: a radio that receives AM (radio_am.h)
+static bool ced_am_ok(void)
+{
+	return CONFIG_AM_RX && radio_am_capable();
 }
 
 // A copy of what the radio uses now (temporary changes included), named after it: "Name 2", or the frequency
@@ -1612,6 +1620,7 @@ static void ced_from_view(void)
 static void ced_build(void)
 {
 	bool dmr = CONFIG_DMR && ced_ch.mode == RADIO_MODE_DMR;
+	bool am = !dmr && ced_ch.am;	// AM receives only: no tones or VOX
 	bool edit = CONFIG_CHANNEL_EDIT;
 	bool fresh = false, changed = false;
 #if CONFIG_CHANNEL_EDIT
@@ -1622,7 +1631,8 @@ static void ced_build(void)
 	for (uint8_t r = 0; r < CE_COUNT; r++) {
 		bool fm_only = r == CE_BW || r == CE_RX_TONE || r == CE_TX_TONE || r == CE_VOX;
 		bool dmr_only = r >= CE_CC && r <= CE_ALIAS2;
-		if ((fm_only && dmr) || (dmr_only && !dmr) || (r == CE_MODE && !CONFIG_DMR))
+		bool tone_row = r == CE_RX_TONE || r == CE_TX_TONE || r == CE_VOX;
+		if ((fm_only && dmr) || (dmr_only && !dmr) || (tone_row && am) || (r == CE_MODE && !CONFIG_DMR && !ced_am_ok()))
 			continue;
 		if ((r == CE_ZONES || r == CE_GO || r == CE_SHARE || r == CE_SAVE_NEW) && fresh)
 			continue;
@@ -1802,7 +1812,7 @@ static void chinfo_item(uint16_t i, ui_item_t *it)
 		sb_u32(&b, ced_num, 1);
 		break;
 	case CE_MODE:
-		sb_str(&b, ch->mode == RADIO_MODE_DMR ? "DMR" : "FM");
+		sb_str(&b, ch->mode == RADIO_MODE_DMR ? "DMR" : ch->am ? "AM" : "FM");
 		break;
 	case CE_RX:
 		sb_freq(&b, ch->rx_hz);
@@ -2152,7 +2162,19 @@ static void chinfo_select(uint16_t i, bool hold)
 	uint8_t r = ced_rows[i];
 	switch (r) {
 	case CE_NAME: ui_text_open(c->name, CODEPLUG_NAME_LEN); break;
-	case CE_MODE: c->mode = c->mode == RADIO_MODE_DMR ? RADIO_MODE_FM : RADIO_MODE_DMR; break;
+	case CE_MODE:	// FM, AM (receive only, an FM channel with the AM flag), DMR, round again
+		if (c->mode == RADIO_MODE_DMR) {
+			c->mode = RADIO_MODE_FM;
+			c->am = false;
+		} else if (!c->am && ced_am_ok()) {
+			c->am = true;
+		} else if (CONFIG_DMR) {
+			c->mode = RADIO_MODE_DMR;
+			c->am = false;
+		} else {
+			c->am = false;
+		}
+		break;
 	case CE_RX:
 	case CE_TX:
 	case CE_ID:
