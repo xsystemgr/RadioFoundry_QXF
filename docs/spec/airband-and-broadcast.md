@@ -31,26 +31,30 @@ audio path, open questions, bring-up checks) are on its hardware and bring-up pa
 
 ### 3.1 Representation: derived from the frequency, codeplug unchanged
 
-The open-firmware CPS codeplug has no AM modulation, and RadioFoundry keeps the standard format as long as possible. So AM is not
-stored: **an FM channel or the VFO tuned inside 108-137 MHz is received in AM** on a radio that can. This is how
+The open-firmware CPS codeplug has no AM modulation, and RadioFoundry keeps the standard format as long as possible. So AM is
+mostly not stored: **an FM channel or the VFO tuned inside 108-137 MHz or 225-400 MHz is received in AM** on a radio that
+can. On top of that, an FM channel can carry the **AM flag** (bit 0 of the channel record's byte 0x36, ours,
+`open-firmware-cps.md` 7.3.3): it is received in AM at any frequency the board receives, and never transmits. qdmr
+doesn't know the bit and leaves it as 0 on the channels it writes; the Codeplug Editor and the CSV "AM" column set it. This is how
 most radios with an air band behave, it needs no CPS change, and qdmr can program air channels today (as FM
-channels in that range). The band is an ITU allocation, the same everywhere, so the range is a core constant
-(`RADIO_AM_LO_HZ` / `RADIO_AM_HI_HZ` in `core/radio/radio_am.h`), not a board value. A DMR channel in the range stays
+channels in that range). The bands are allocations that are AM everywhere, so the ranges are core constants
+(`RADIO_AM_LO_HZ` / `RADIO_AM_HI_HZ` and `RADIO_AM_UHF_LO_HZ` / `RADIO_AM_UHF_HI_HZ` in `core/radio/radio_am.h`), not board
+values; a board receives one only when its band table lists it (3.4). A DMR channel in the range stays
 DMR (and can't transmit there). Against a stored AM flag: it would need the native codeplug first, and an AM
-channel outside the air band has no use on these radios.
+channel outside the air bands is rare on these radios, so it is a flag rather than a mode.
 
 ### 3.2 Behavior
 
 | Item | Behavior |
 |---|---|
-| When | `CONFIG_AM_RX`, the board has `CAP_AM_RX` and `board.radio->rx_am`, the channel is FM and its RX frequency is in [108, 137) MHz |
+| When | `CONFIG_AM_RX`, the board has `CAP_AM_RX` and `board.radio->rx_am`, the channel is FM and its RX frequency is in [108, 137) or [225, 400) MHz, or it has the AM flag |
 | Tuning | `tune()` calls `rx_am(hz, bw)` instead of `rx()`; if the board refuses, FM as before. `view.am` says AM is on |
-| Transmit | refused with `TXDENY_AM` whenever `view.am`, and for any TX frequency in the air band on an AM radio (split channels, DMR channels, the VFO, the data service, the hotspot's frequencies) |
+| Transmit | refused with `TXDENY_AM` ("AM: receive only") whenever `view.am`, and for any TX frequency in an air band on an AM radio (split channels, DMR channels, the VFO, the data service, the hotspot's frequencies) |
 | Squelch | on the RSSI: `radio_am_noise()` maps dBm onto the FM noise scale (-18 dBm = 0, 1 dB per step), so the levels and hysteresis are the FM ones: level 1 opens above -82 dBm, 5 above -70, 9 above -58. The boards' AM RSSI isn't calibrated: empty air band channels read -76 to -86 dBm on a radio (2026-10-22), so level 5 sits about 8 dB above that. `view.noise` holds that value in AM. Scan uses the same value |
 | Sub-audio | ignored in AM (`tone_needed()` is false, the tone counts as heard) |
 | Steps | `radio_req_vfo_step_size()` (RREQ_VFO_STEP_SIZE, stored in `settings_t.vfo_step_hz`; 0 is auto, the default: 25 kHz at width 25K or in AM, else `RADIO_VFO_STEP_HZ`, recomputed on every view change, with `view.vfo_step_auto` set; Settings › Talk › VFO step); 8333 means the exact 8.33 kHz grid (n x 25/3 kHz, `radio_am_step()` snaps and steps without drift); 25 kHz is a plain step |
 | Band table | the board lists the air band as an RX-only band ({108000000, 136000000, false} after the VHF TX band) |
-| Screen | "AM" in place of "FM" for the mode on Home, in the strip, on the mode tile and in the channel list. Home's chips are "Air Band AM" and the squelch level (no tone, width or power). PTT shows "Air band: receive only" |
+| Screen | "AM" in place of "FM" for the mode on Home, in the strip, on the mode tile and in the channel list. Home's chips are "Air Band AM" in an air band, "AM receive" on a flagged channel elsewhere, and the squelch level (no tone, width or power). PTT shows "AM: receive only" |
 
 ### 3.3 Board contract (hal_radio.h)
 
@@ -58,6 +62,13 @@ channel outside the air band has no use on these radios.
 RSSI in dBm (noise isn't used in AM) and `tone_ok = true`. `tx()` is never called while AM is on. NULL = no AM.
 On an FD6818 `rx_am` is `rx` plus the AF output type AM (`fd6818_set_am`, 0x47 = 0x0740; inferred, section 2);
 `rx()` and `set_mode()` write FM back.
+
+### 3.4 The military UHF air band (225-400 MHz)
+
+NATO's UHF aeronautical band (243.000 MHz guard and the rest) is AM like the VHF one. It is in `radio_am_band()`, so an
+FM channel or the VFO there is AM and TX is refused, but a board only tunes it when its band table lists
+{225000000, 400000000, false}. Which radios do is in [feature-matrix.md](../feature-matrix.md) and their hardware pages;
+on most of these radios the band sits between the VHF and UHF front-end filters, so expect strong local signals only.
 
 ## 4. Broadcast FM
 
@@ -136,7 +147,8 @@ The board must also set the capability bits; without them the code does nothing 
 
 | Test | Covers |
 |---|---|
-| `tests/host/radioListenBandsTest.c` | AM and broadcast channels and VFO, TX refusal, squelch, the steps, a dead receiver |
+| `tests/host/radioListenBandsTest.c` | AM and broadcast channels and VFO, TX refusal, squelch, the steps, a dead receiver, the AM flag, the UHF air band |
+| `tests/host/codeplugTest.c` | the AM flag in the channel record (0x36 bit 0) |
 | `tests/host/fd6818Test.c` | the AF output word for AM and back to FM |
 | `tests/host/uiFlowTest.c` | the FM broadcast step row on a radio with the receiver |
 | `tests/hil/test_listen_bands.py` | the VFO at 118.0 MHz gives `am=1`; at 100.1 MHz `bcast=1` and `bcast_fault=0`. Nothing keys |

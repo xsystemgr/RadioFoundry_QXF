@@ -149,6 +149,7 @@ static const band_t bands[] = {
 	{ 400000000, 480000000, true },
 	{ 108000000, 136000000, false },
 	{ 65000000, 108000000, false },
+	{ 225000000, 400000000, false },	// the military UHF air band, receive only
 };
 static const char *const power_names[] = { "L", "M", "H" };
 
@@ -156,7 +157,7 @@ const board_t board = {
 	.name = "fake-am",
 	.caps = CAP_AM_RX | CAP_BCAST_FM | CAP_DMR,
 	.bands = bands,
-	.band_count = 4,
+	.band_count = 5,
 	.bcast = &fake_bcast,
 	.power_count = 3,
 	.power_names = power_names,
@@ -300,6 +301,17 @@ static void test_helpers(void)
 	CHECK(radio_am_channel(&ch));
 	ch.mode = RADIO_MODE_DMR;
 	CHECK(!radio_am_channel(&ch));
+	// The military UHF air band, 225-400 MHz (hi exclusive)
+	CHECK(radio_am_band(225000000) && radio_am_band(243000000) && radio_am_band(399975000));
+	CHECK(!radio_am_band(224999999) && !radio_am_band(400000000) && !radio_am_band(446006250));
+	CHECK(radio_am_tx_refused(243000000) && !radio_am_tx_refused(446006250));
+	// The AM flag: an FM channel anywhere is AM; a DMR channel never is
+	ch = (channel_t){ .rx_hz = 145500000, .mode = RADIO_MODE_FM };
+	CHECK(!radio_am_channel(&ch));
+	ch.am = true;
+	CHECK(radio_am_channel(&ch));
+	ch.mode = RADIO_MODE_DMR;
+	CHECK(!radio_am_channel(&ch));
 	// The squelch scale: -18 dBm and stronger is 0, every dB weaker adds one
 	CHECK(radio_am_noise(-10) == 0 && radio_am_noise(-18) == 0 && radio_am_noise(-70) == 52);
 	CHECK(radio_am_noise(-400) == 255);
@@ -372,6 +384,35 @@ static void test_am_channel(void)
 	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_AM && hw.tx_calls == 0);
 	ptt(false);
 	CHECK(sm.view.state == RS_IDLE);
+}
+
+// The AM flag on an FM channel outside the air bands, and a channel in the military UHF air band
+static void test_am_flag_and_uhf(void)
+{
+	start();
+	chans[3].am = true;	// Simplex 146.520 flagged AM
+	chans[4].am = true;	// AirDMR: the flag means nothing on DMR
+	req(RREQ_ZONE_POS, 2);
+	run(50);
+	CHECK(sm.view.am && hw.am && hw.rx_hz == 146520000 && sm.view.ch.mode == RADIO_MODE_FM);
+	ptt(true);
+	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_AM && hw.tx_calls == 0);
+	ptt(false);
+	req(RREQ_ZONE_POS, 3);
+	run(100);
+	CHECK(!sm.view.am && !hw.am);
+
+	chans[1].rx_hz = chans[1].tx_hz = 243000000;	// Tower moved to 243.000 (UHF guard)
+	req(RREQ_ZONE_POS, 0);
+	run(50);
+	CHECK(sm.view.am && hw.am && hw.rx_hz == 243000000);
+	ptt(true);
+	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_AM && hw.tx_calls == 0);
+	ptt(false);
+
+	req(RREQ_VFO_SET, 251900000);	// the VFO in the UHF air band
+	run(50);
+	CHECK(sm.view.vfo && sm.view.am && hw.rx_hz == 251900000);
 }
 
 static void test_tone_ignored(void)
@@ -613,6 +654,7 @@ int main(void)
 {
 	test_helpers();
 	test_am_channel();
+	test_am_flag_and_uhf();
 	test_tone_ignored();
 	test_fm_and_dmr();
 	test_board_refuses();

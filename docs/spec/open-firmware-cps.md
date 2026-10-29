@@ -434,7 +434,7 @@ assuming 500 ms steps (`codeplug.c` `GEN_HANG_UNIT_MS`, `dmr-voice.md` 7); that 
 | 0x32 | 1 | flag3: bits 6-7 = 0b11 STE, bit 5 non-STE.  |
 | 0x33 | 1 | flag4: bit 7 power (vendor; superseded by 0x19), bit 6 VOX, bit 5 zone scan skip, bit 4 all-channel scan skip, bit 3 talkaround (unused), bit 2 RX only, bit 1 bandwidth 25 kHz (clear = 12.5 kHz), bit 0 squelch (vendor) |
 | 0x34 | 2 | VFO offset frequency (vendor; qdmr uses it as the VFO TX offset) |
-| 0x36 | 1 | VFO flags: bits 4-7 step index (2.5, 5, 6.25, 10, 12.5, 25, 30, 50 kHz); bits 2-3 offset mode (qdmr) |
+| 0x36 | 1 | VFO flags: bits 4-7 step index (2.5, 5, 6.25, 10, 12.5, 25, 30, 50 kHz); bits 2-3 offset mode (qdmr); bit 0 AM receive (ours: FM channels only, receive only, `airband-and-broadcast.md` 3.1; DMR channels keep it as read) |
 | 0x37 | 1 | Squelch: 0 = the radio's default, 1-21 = level. Values above 21 are read as 10 |
 
 Location: each coordinate is 24 bits, assembled from its high, middle and low bytes. Bit 23 is the sign (1 = south or

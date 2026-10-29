@@ -7,6 +7,7 @@
 #include "ui_screens.h"
 #include "fmt.h"
 #include "ui_svc.h"
+#include "radio/radio_am.h"
 #include "config.h"
 
 ui_layout_t ui_layout;
@@ -921,7 +922,7 @@ static void draw_chips(const radio_view_t *v, const ui_state_t *s)
 #endif
 	if (v->am || v->bcast) {
 		// No tone, width or power here: the receiver is fixed. The air band squelch is real, the broadcast one isn't used
-		x = gfx_text(f, x, y, v->am ? "Air Band AM" : "Broadcast FM", ui_col.fg) + f->w;
+		x = gfx_text(f, x, y, v->am ? (radio_am_band(v->ch.rx_hz) ? "Air Band AM" : "AM receive") : "Broadcast FM", ui_col.fg) + f->w;
 		if (v->am) {
 			sb_init(&b, buf, sizeof buf);
 			sb_str(&b, "SQ");
@@ -1010,7 +1011,7 @@ static const char *deny_reason(const radio_view_t *v, char *buf, size_t len)
 	case TXDENY_REJECTED: sb_str(&b, "Modem refused to send"); break;
 	case TXDENY_HOTSPOT: sb_str(&b, "Hotspot mode: PTT off"); break;
 	case TXDENY_NO_ID: sb_str(&b, "No DMR ID in codeplug"); break;
-	case TXDENY_AM: sb_str(&b, "Air band: receive only"); break;
+	case TXDENY_AM: sb_str(&b, "AM: receive only"); break;
 	case TXDENY_BCAST: sb_str(&b, "Broadcast: receive only"); break;
 	case TXDENY_SFR_RPT: sb_str(&b, "Repeater channel: PTT off"); break;
 	default: sb_str(&b, "Not allowed here"); break;

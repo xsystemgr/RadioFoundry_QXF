@@ -315,6 +315,7 @@ export const TABLES = {
 			ref("APRS", "aprs", "aprs", ["APRS Configuration"]),
 			c("DMR ID", "dmrId", asId, (r) => r.dmrId || "", ["Channel DMR ID"]),
 			c("RX Only", "rxOnly", asBool, (r) => yesNo(r.rxOnly)),
+			c("AM", "am", asBool, (r) => yesNo(r.am), ["AM Receive"]),
 			c("All Skip", "allSkip", asBool, (r) => yesNo(r.allSkip), ["Scan Skip"]),
 			c("Zone Skip", "zoneSkip", asBool, (r) => yesNo(r.zoneSkip)),
 			c("VOX", "vox", asBool, (r) => yesNo(r.vox)),

@@ -15,6 +15,9 @@
 // mobile), AM everywhere in the world. hi is exclusive
 #define RADIO_AM_LO_HZ		108000000u
 #define RADIO_AM_HI_HZ		137000000u
+// The military UHF air band (NATO, 225-400 MHz), AM as well. Received only where the board lists it as a band
+#define RADIO_AM_UHF_LO_HZ	225000000u
+#define RADIO_AM_UHF_HI_HZ	400000000u
 
 // Air band channel steps: 25 kHz, and the 8.33 kHz spacing (25 kHz / 3) used in Europe. RADIO_AM_STEP_833 is the
 // step value that means "the 8.33 kHz grid" (radio_am_step keeps the frequency on the exact grid)
@@ -28,11 +31,15 @@
 // isn't calibrated, so level 5 sits about 8 dB above that floor
 #define RADIO_AM_SQL_REF_DBM	(-18)
 
-// hz is in the air band
-bool radio_am_band(uint32_t hz);
+// hz is in an air band (VHF or military UHF). Inline: the UI uses it without the radio core
+static inline bool radio_am_band(uint32_t hz)
+{
+	return (hz >= RADIO_AM_LO_HZ && hz < RADIO_AM_HI_HZ) || (hz >= RADIO_AM_UHF_LO_HZ && hz < RADIO_AM_UHF_HI_HZ);
+}
 // This radio receives AM (CAP_AM_RX and board.radio->rx_am)
 bool radio_am_capable(void);
-// The channel (or the VFO's settings) is received in AM here: an FM channel in the air band on a radio that can
+// The channel (or the VFO's settings) is received in AM here: an FM channel in an air band, or one with the AM flag,
+// on a radio that can
 bool radio_am_channel(const channel_t *ch);
 // Transmitting on hz is refused because it is in the air band of a radio that receives AM there
 bool radio_am_tx_refused(uint32_t hz);

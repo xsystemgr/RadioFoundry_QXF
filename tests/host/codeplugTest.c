@@ -216,6 +216,31 @@ static void test_openfw(void)
 	CHECK(z.count == 3 && z.channels[0] == 1 && z.channels[1] == 2 && z.channels[2] == 200);
 }
 
+// The AM flag (0x36 bit 0, ours): read, written back, the VFO step bits kept, never AM on a DMR channel
+static void test_am_flag(void)
+{
+	uint8_t r[CODEPLUG_OPENFW_CHANNEL_SIZE];
+	memset(r, 0xFF, sizeof(r));	// erased: the encoder starts from a blank record
+	channel_t ch = { .name = "AM 2m", .rx_hz = 144990000, .tx_hz = 144990000, .mode = RADIO_MODE_FM,
+			 .bw = RADIO_BW_25K, .power = CODEPLUG_POWER_DEFAULT, .timeslot = 1, .am = true };
+	codeplug_openfw_encode(&ch, r);
+	CHECK(r[0x36] == 0x01 && (r[0x31] & 0x01) == 0);
+	channel_t out;
+	CHECK(codeplug_openfw_decode(r, &out) && out.am && out.mode == RADIO_MODE_FM);
+	r[0x36] |= 0x50;	// a VFO step index alongside: kept
+	ch.am = false;
+	codeplug_openfw_encode(&ch, r);
+	CHECK(r[0x36] == 0x50);
+	CHECK(codeplug_openfw_decode(r, &out) && !out.am);
+	// DMR: the bit is left as read and never makes the channel AM
+	r[0x36] |= 0x01;
+	ch.mode = RADIO_MODE_DMR;
+	ch.am = false;
+	codeplug_openfw_encode(&ch, r);
+	CHECK(r[0x36] == 0x51);
+	CHECK(codeplug_openfw_decode(r, &out) && !out.am && out.mode == RADIO_MODE_DMR);
+}
+
 static void test_erased(void)
 {
 	memset(image, 0xFF, IMAGE_SIZE);	// bitmaps say "all in use", every record fails the BCD check
@@ -516,6 +541,7 @@ int main(void)
 #endif
 	test_dmr_records();
 	test_iddb();
+	test_am_flag();
 	test_erased();
 	test_no_flash();
 	free(image);

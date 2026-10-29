@@ -5,11 +5,6 @@
 #include "radio/radio_am.h"
 #include "config.h"
 
-bool radio_am_band(uint32_t hz)
-{
-	return hz >= RADIO_AM_LO_HZ && hz < RADIO_AM_HI_HZ;
-}
-
 bool radio_am_capable(void)
 {
 	return CONFIG_AM_RX && (board.caps & CAP_AM_RX) != 0 && board.radio != NULL && board.radio->rx_am != NULL;
@@ -17,7 +12,7 @@ bool radio_am_capable(void)
 
 bool radio_am_channel(const channel_t *ch)
 {
-	return radio_am_capable() && ch->mode == RADIO_MODE_FM && radio_am_band(ch->rx_hz);
+	return radio_am_capable() && ch->mode == RADIO_MODE_FM && (ch->am || radio_am_band(ch->rx_hz));
 }
 
 bool radio_am_tx_refused(uint32_t hz)

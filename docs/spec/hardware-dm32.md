@@ -790,6 +790,10 @@ The PA is switched off from the next timeslot interrupt once the burst has run a
 
 ### 8.7 Air band AM and the broadcast receiver
 
+The band table also lists the military UHF air band, 225-400 MHz, receive only (`airband-and-broadcast.md` 3.4). It is
+outside both front-end filters (136-174 and 400-480 MHz): 225-280 MHz comes in through the VHF LNA and 280-400 MHz through
+the UHF one (`UHF_FROM_HZ`), and the FD6818's band table covers it (8.3). Sensitivity there isn't measured yet.
+
 The generic design is in [airband-and-broadcast.md](airband-and-broadcast.md); the bring-up checks in
 [dm32-bringup.md](../testing/dm32-bringup.md) 11 answer the questions below. 
 

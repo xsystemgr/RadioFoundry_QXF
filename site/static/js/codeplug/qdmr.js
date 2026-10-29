@@ -272,7 +272,7 @@ export function importQdmr(m, yamlText) {
 		const c = {
 			number: null, name: shorten(v.name, LIMITS.name), rxHz, txHz, mode: dmr ? "dmr" : "fm",
 			power: POWER[text(v.power)] ?? 0, tot: tot ? Math.min(Math.ceil(tot / 15000) * 15, 255 * 15) : 0,
-			rxTone: "", txTone: "", bw: 12.5, rxOnly: v.rxOnly === true, allSkip: o.scanAllSkip === true,
+			rxTone: "", txTone: "", bw: 12.5, rxOnly: v.rxOnly === true, am: false, allSkip: o.scanAllSkip === true,
 			zoneSkip: o.scanZoneSkip === true, vox: voxOn(v.vox), squelch: 0, colorCode: 0, timeslot: 1, contact: null,
 			rxList: null, aprs: null, dmrId: 0, noBeep: o.beep === false, noEco: o.powerSave === false, dmo: false,
 			roam: false, aliasTs1: Math.max(0, ALIAS.indexOf(text(o.talkerAliasTS1))),

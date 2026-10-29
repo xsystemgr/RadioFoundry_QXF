@@ -1242,6 +1242,7 @@
  "editor.col.contact": "TX Contact",
  "editor.col.rx_list": "RX Group List",
  "editor.col.rx_only": "RX Only",
+ "editor.col.am": "AM receive",
  "editor.col.zone_skip": "Zone Scan Skip",
  "editor.col.all_skip": "All-Channel Scan Skip",
  "editor.col.channels": "Channels",

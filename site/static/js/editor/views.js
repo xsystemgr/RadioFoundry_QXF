@@ -121,6 +121,7 @@ export function columns(table, m, t) {
 			only("dmr", col("contact", "editor.col.contact", "select", pick, { options: () => refOptions(m.contacts, t), format: (v) => refLabel(v, t), sortValue: (r) => refLabel(r.contact, t) })),
 			only("dmr", col("rxList", "editor.col.rx_list", "select", pick, { options: () => refOptions(m.rxLists, t), format: (v) => refLabel(v, t), sortValue: (r) => refLabel(r.rxList, t) })),
 			col("rxOnly", "editor.col.rx_only", "bool", bool),
+			only("fm", col("am", "editor.col.am", "bool", bool)),
 			col("zoneSkip", "editor.col.zone_skip", "bool", bool),
 		];
 	case "zones":
@@ -217,6 +218,7 @@ export function channelForm(m, t) {
 		txt("tot", "editor.col.tot", tot(t), (v) => (v ? String(v) : t("editor.tot.default"))),
 		chk("rxOnly", "editor.col.rx_only"),
 		fm({ group: t("editor.form.analog") }),
+		fm(chk("am", "editor.col.am")),
 		fm(sel("bw", "editor.col.bw", () => [[12.5, "12.5 kHz"], [25, "25 kHz"]])),
 		fm(txt("rxTone", "editor.col.rx_tone", tone(t), (v) => v)),
 		fm(txt("txTone", "editor.col.tx_tone", tone(t), (v) => v)),

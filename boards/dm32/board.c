@@ -22,6 +22,10 @@ static const band_t bands[] = {
 	{ 400000000, 480000000, true },
 #if CONFIG_AM_RX
 	{ 108000000, 136000000, false },	// the air band, AM receive only (docs/spec/airband-and-broadcast.md 3)
+	// The military UHF air band, AM receive only (airband-and-broadcast.md 3.4). Outside both front-end filters
+	// (136-174 / 400-480 MHz): 225-280 MHz goes through the VHF LNA, 280-400 MHz through the UHF one (UHF_FROM_HZ), so
+	// expect strong local signals only
+	{ 225000000, 400000000, false },
 #endif
 #if CONFIG_BCAST_FM
 	{ 65000000, 108000000, false },		// the broadcast band, on the RDA5807M (airband-and-broadcast.md 4)

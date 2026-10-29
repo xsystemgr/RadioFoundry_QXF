@@ -28,6 +28,7 @@ typedef struct {
 	subtone_t tx_tone;
 	uint8_t power;		// board power level index, or CODEPLUG_POWER_DEFAULT
 	bool rx_only;
+	bool am;		// receive in AM (FM channels, receive only; docs/spec/airband-and-broadcast.md 3.1)
 	// DMR (unused by FM)
 	uint8_t color_code;
 	uint8_t timeslot;	// 1 or 2

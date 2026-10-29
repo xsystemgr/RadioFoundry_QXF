@@ -358,3 +358,20 @@ test("codeplug.bin for USB network mode carries the ID database when there is on
 	iddb.write(small, recs.slice(0, 10), { textLen: 16 });
 	assert.equal(tftpBytes(small).length, TFTP_SIZE);
 });
+
+test("the AM flag: 0x36 bit 0 on FM channels, kept as read on DMR", async () => {
+	const { decodeChannel, encodeChannel } = await import("../static/js/codeplug/records.js");
+	const r = new Uint8Array(56).fill(0xff);
+	const c = { ...newChannel(), name: "AM 2m", rxHz: 144990000, txHz: 144990000, mode: "fm", am: true };
+	encodeChannel(c, r);
+	assert.equal(r[0x36] & 0x01, 1);
+	assert.equal(decodeChannel(r).am, true);
+	r[0x36] |= 0x50;
+	encodeChannel({ ...c, am: false }, r);
+	assert.equal(r[0x36], 0x50);
+	assert.equal(decodeChannel(r).am, false);
+	r[0x36] |= 0x01;
+	encodeChannel({ ...c, mode: "dmr", am: false }, r);
+	assert.equal(r[0x36], 0x51);
+	assert.equal(decodeChannel(r).am, false);
+});

@@ -73,6 +73,7 @@ export function decodeChannel(r) {
 		txTone: getTone(r, 0x22),
 		bw: f4 & 0x02 ? 25 : 12.5,
 		rxOnly: (f4 & 0x04) !== 0,
+		am: r[0x18] !== 1 && (r[0x36] & 0x01) !== 0,	// ours: receive in AM (FM channels)
 		allSkip: (f4 & 0x10) !== 0,
 		zoneSkip: (f4 & 0x20) !== 0,
 		vox: (f4 & 0x40) !== 0,
@@ -114,6 +115,7 @@ export function encodeChannel(c, r) {
 	r[0x37] = clamp(c.squelch, 0, 21);
 	r[0x2C] = (r[0x2C] & 0xF0) | (c.colorCode & 0x0F);
 	r[0x31] = (r[0x31] & ~0x40) | (c.timeslot === 2 ? 0x40 : 0);
+	if (c.mode !== "dmr") r[0x36] = (r[0x36] & ~0x01) | (c.am ? 0x01 : 0);	// AM (ours); DMR keeps it as read
 	put16(r, 0x2E, c.contact || 0);
 	r[0x2B] = clamp(c.rxList || 0, 0, 255);
 	r[0x2D] = clamp(c.aprs || 0, 0, 255);

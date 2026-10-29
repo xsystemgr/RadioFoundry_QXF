@@ -49,6 +49,8 @@ static uint32_t fl_base = DEFAULT_FLASH_BASE;
 #define CH_FLAG1	0x30u	// bits 0-1 talker alias on TS1, 2-3 on TS2: 0 off, 1 APRS, 2 text, 3 both
 #define CH_FLAG2	0x31u
 #define CH_FLAG4	0x33u
+#define CH_VFO_FLAGS	0x36u	// bits 4-7 VFO step, 2-3 offset mode (qdmr); bit 0 AM (ours)
+#define VFOF_AM		0x01u	// receive in AM, FM channels only (open-firmware-cps.md 7.3.3)
 #define FLAG2_TS2	0x40u
 #define FLAG4_VOX	0x40u
 #define FLAG4_ZONE_SKIP	0x20u	// zone scan skip
@@ -475,6 +477,7 @@ bool codeplug_openfw_decode(const uint8_t *r, channel_t *out)
 	out->rx_only = (r[CH_FLAG4] & FLAG4_RX_ONLY) != 0;
 	out->color_code = r[CH_CC] & 0x0Fu;
 	out->timeslot = (r[CH_FLAG2] & FLAG2_TS2) ? 2 : 1;
+	out->am = out->mode == RADIO_MODE_FM && (r[CH_VFO_FLAGS] & VFOF_AM) != 0;
 	out->contact = le16(&r[CH_CONTACT]);
 	out->listen_list = r[CH_RX_GROUP];
 	if (r[CH_LFLAG1] & LFLAG1_ID) {
@@ -523,6 +526,9 @@ void codeplug_openfw_encode(const channel_t *ch, uint8_t *r)
 	r[CH_FLAG4] = (uint8_t)((r[CH_FLAG4] & ~(FLAG4_RX_ONLY | FLAG4_25K)) | (ch->rx_only ? FLAG4_RX_ONLY : 0) |
 				(ch->bw == RADIO_BW_25K ? FLAG4_25K : 0));
 	r[CH_FLAG2] = (uint8_t)((r[CH_FLAG2] & ~FLAG2_TS2) | (ch->timeslot == 2 ? FLAG2_TS2 : 0));
+	if (ch->mode == RADIO_MODE_FM) {	// a DMR channel keeps the bit as read (it means nothing there)
+		r[CH_VFO_FLAGS] = (uint8_t)((r[CH_VFO_FLAGS] & ~VFOF_AM) | (ch->am ? VFOF_AM : 0));
+	}
 	r[CH_CC] = ch->color_code & 0x0Fu;
 	put16(&r[CH_CONTACT], ch->contact);
 	r[CH_RX_GROUP] = (uint8_t)(ch->listen_list <= 0xFFu ? ch->listen_list : 0);

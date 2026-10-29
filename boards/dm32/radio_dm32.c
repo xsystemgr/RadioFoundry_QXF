@@ -280,7 +280,8 @@ static bool rx(uint32_t hz, radio_bw_t bw, const subtone_t *tone)
 #if CONFIG_AM_RX
 // Air band AM (docs/spec/airband-and-broadcast.md 3.3, hardware-dm32.md 8.7): FM receive with the FD6818's AF output on
 // its AM demodulator. The speaker plays that output straight, as in FM receive (speaker_source); no sub-audio. The
-// 108-136 MHz signal comes in through the VHF LNA
+// 108-136 MHz signal comes in through the VHF LNA, 225-400 MHz through whichever LNA lna() picks. Also used for FM
+// channels with the AM flag in the normal bands
 static bool rx_am(uint32_t hz, radio_bw_t bw)
 {
 	return rx_tune(hz, bw, NULL, true);
