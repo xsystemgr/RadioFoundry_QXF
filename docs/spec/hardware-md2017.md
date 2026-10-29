@@ -53,18 +53,69 @@ On the MD-UV380 PD9 is the RX audio mux and PD8 the LCD backlight; on the MD-201
 is on another pin (?: R4). The same routine writes PC4, PC5 and PC6 low (PC6 is the PA band select on the MD-UV380,
 PC5 in its TX path).
 
-## 3. Open questions (next steps)
+### 2.2 Front-end supplies per receiver
+
+Each receiver has its own VHF and UHF RX supply. A routine (0x0804531E) reads both channels' frequencies (stored in
+BCD: 0x40000000 = 400 MHz, 0x20000000 = 200 MHz) and switches them per band, after a routine that first drives all of
+them and the TX supplies (PC4, PC5) low (image):
+
+| Receiver | UHF (>= 400 MHz) | VHF (<= 200 MHz) |
+|---|---|---|
+| A, chip 1 (0x2E) | **PC9** | **PA5** |
+| B, chip 0 (0x71) | **PA8** | **PA2** |
+
+All four band combinations occur (A UHF + B VHF: PC9 and PA2, and so on), so the two receivers can sit in different
+bands. On the MD-UV380, PA2 / PA5 are its one receiver's UHF / VHF supplies and PA8 / PC9 are the AT1846S I2C pins.
+
+## 3. Pin map against the MD-UV380
+
+From every GPIO_Init (mode), GPIO_PinAFConfig (alternate function) and read / write call in the image (image).
+"Same" means the MD-UV380 column of [hardware-mduv380.md](hardware-mduv380.md) and `boards/uv380_family/pins.h`.
+
+| Pin | MD-2017 | MD-UV380 | |
+|---|---|---|---|
+| PA0, PA1, PA3, PA4 | analog | volume, battery, mic level, APC DAC | same |
+| PA2 / PA5 | out | RX UHF / VHF supply | **receiver B VHF / receiver A VHF** (2.2) |
+| PA6, PD2, PD3 | in pull-up / out | key rows | same |
+| PA7 | out | power latch | same |
+| PA8 / PC9 | out | AT1846S I2C3 SCL / SDA | **receiver B UHF / receiver A UHF supply** |
+| PA11, PA12 | AF10 | USB | same |
+| PA13 | in pull-up, read | mic power (out) | **differs** (?) |
+| PA15 | in | — | new (?) |
+| PB0, PB1 | in | (PB1 AT1846S GPIO0, unverified) | (?) |
+| PB2 | out, written in the RX / TX switching | (AT1846S GPIO6, unverified) | (?) |
+| PB3-PB5 | AF5 | SPI flash | same |
+| PB6 / PB7 | out / in-out | — | **AT1846S bus SCL / SDA** (2) |
+| PB8, PB9 | out | speaker mute, audio amplifier | same |
+| PB10 | in pull-up | — | new input (?) |
+| PB11, PE14 | in pull-up | channel encoder | same |
+| PB12, PB13-PB15 | out, AF5 | HR_C6000 voice SPI2 | same |
+| PC0-PC2 | in | HR_C6000 interrupts | same |
+| PC4, PC5 | out | APC enable, TX supply | same |
+| PC6 | out | PA band select | same (written low in RX) |
+| PC7, PC8 | AF3 TIM8 | CTCSS / beep PWM | same |
+| PC13 | out | — | new (?) |
+| PD0, PD1, PD4, PD5, PD12, PD14, PD15, PE7-PE10 | AF12 FSMC | LCD bus | same |
+| PD6, PD13 | out | LCD CS, LCD reset | same |
+| PD8 / PD9 | out, opposite levels | backlight / RX audio mux | **receiver switch B / A** (2.1); the backlight is elsewhere (?) |
+| PD10, PD11 | in, read | — | new inputs (a second knob? ?) |
+| PE0, PE1 | out | LEDs | same |
+| PE2-PE6 | out / in | HR_C6000 control SPI, PWD | same pins (the directions not all decoded yet) |
+| PE11, PE12 | in pull-up | PTT, external PTT | same |
+| PE13, PE15 | in pull-up | — | new inputs (keys? ?) |
+
+## 4. Open questions (next steps)
 
 | # | Question | How |
 |---|---|---|
 | R1 | How the two receivers' audio reaches the speaker (a mux GPIO, a mixer, both at once) | the image's audio path set-up next to the RX routine's callers |
 | R2 | Which receiver feeds the HR_C6000 for DMR, and whether the second can | the HR_C6000 input set-up; the DMR entry's chip arguments |
-| R3 | Each chip's LNA, filter and band select pins (the second chip's VHF / UHF switch) | GPIO writes in the RX set-up per chip |
-| R4 | Display, keys, knobs, LEDs, PA and backlight pins against the MD-UV380 table | the image's GPIO set-up at start |
+| R3 | ~~Each receiver's band supplies~~: done (2.2) | |
+| R4 | The pins marked (?) in section 3: the backlight, PA13, PA15, PB0-PB2, PB10, PC13, PD10, PD11, PE13, PE15 | the code reading or writing each one; then on the radio |
 | R5 | The codec window of V4.05 for rfoundry | `stockfw` search, as for the MD-UV380 builds |
 | R6 | Bootloader entry keys and DFU loader (expected the MD-UV380's: PTT and the top side key at power on) | on the radio |
 
-## 4. Sources
+## 5. Sources
 
 The vendor image above, read with `tools/rfoundry` (container, key) and `arm-none-eabi-objdump`. Nothing from other
 open firmware for this radio is used (docs/CLEANROOM.md).
