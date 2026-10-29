@@ -14,6 +14,7 @@
 #include "font.h"
 #include "gfx.h"
 #include "codeplug/codeplug.h"
+#include "radio/radio_am.h"
 
 #define START_GRACE_MS	500	// the radio view may still show no watch this soon after asking for one
 #define BACK_AGAIN_MS	2000	// Back on Home, then Back again within this: the watch stops
@@ -200,6 +201,7 @@ static void pane_fill(uint8_t i)
 	if (s->valid)
 		ch = s->ch;	// as the radio has it: changes for now included
 	p->mode = ch.mode;
+	p->am = radio_am_channel(&ch);
 	p->rx_hz = ch.rx_hz;
 	sbuf_t b;
 	sb_init(&b, p->detail, sizeof p->detail);
@@ -229,6 +231,10 @@ static void pane_fill(uint8_t i)
 		return;
 	}
 #endif
+	if (p->am) {	// no tone or width in AM: the receiver is fixed (as Home's chips)
+		sb_str(&b, radio_am_band(ch.rx_hz) ? "Air Band AM" : "AM receive");
+		return;
+	}
 	if (ch.rx_tone.type == TONE_NONE && ch.tx_tone.type == TONE_NONE) {
 		sb_str(&b, "No tone");
 	} else {
@@ -1287,7 +1293,7 @@ static void pick_item(uint16_t i, ui_item_t *it)
 	// "146.940 FM", else "146.940": the channel's name gives way last
 	sb_str(&b, TEXT_ALT_OPEN);
 	sb_freq(&b, ch.rx_hz);
-	sb_str(&b, ch.mode == RADIO_MODE_DMR ? " DMR" : " FM");
+	sb_str(&b, ch.mode == RADIO_MODE_DMR ? " DMR" : radio_am_channel(&ch) ? " AM" : " FM");
 	sb_str(&b, TEXT_ALT_NEXT);
 	sb_freq(&b, ch.rx_hz);
 	sb_str(&b, TEXT_ALT_CLOSE);

@@ -382,7 +382,7 @@ static int draw_top_as(const radio_view_t *v, radio_state_t st, const ui_state_t
 	const char *mw = mode_word(v);
 #if CONFIG_DUAL_WATCH
 	if (s->dual.on)
-		mw = s->dual.pane[s->dual.sel].mode == RADIO_MODE_DMR ? "DMR" : "FM";
+		mw = s->dual.pane[s->dual.sel].mode == RADIO_MODE_DMR ? "DMR" : s->dual.pane[s->dual.sel].am ? "AM" : "FM";
 #endif
 	int lx = gfx_text(f, x, ty, mw, sfg);
 #if CONFIG_DUAL_WATCH
@@ -1880,7 +1880,7 @@ static void dual_pane(const radio_view_t *v, const ui_state_t *s, int i, int y, 
 		else if (ft->detail == NULL)
 			sb_str(&rb, p->detail);
 	} else if (p->vfo) {
-		sb_str(&b, "VFO FM");
+		sb_str(&b, p->am ? "VFO AM" : "VFO FM");
 		if (ft->detail == NULL)
 			sb_str(&rb, p->detail);
 	} else {
