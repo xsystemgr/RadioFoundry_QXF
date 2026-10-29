@@ -170,6 +170,11 @@ int32_t ui_svc_setting_get(uint8_t id)
 		radio_get_settings(&rs);
 		return rs.bcast_step == RADIO_BCAST_STEP_100 ? 100 : 200;
 #endif
+#if CONFIG_AM_RX
+	case UI_SET_AM_MODE:
+		radio_get_settings(&rs);
+		return rs.am_mode;
+#endif
 	case UI_SET_MIC_GAIN:
 		settings_read(&st);
 		return st.mic_gain <= 10 ? st.mic_gain : 5;
@@ -337,6 +342,9 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 #endif
 #if CONFIG_BCAST_FM
 	case UI_SET_BCAST_STEP:
+#endif
+#if CONFIG_AM_RX
+	case UI_SET_AM_MODE:
 #endif
 #if CONFIG_DMR_ROAMING
 	case UI_SET_ROAM_SURVEY:

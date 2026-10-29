@@ -3970,6 +3970,10 @@ static const char *const n_step[] = { "Auto", "2.5 kHz", "5 kHz", "6.25 kHz", "8
 static const int16_t v_bcast_step[] = { 200, 100 };	// kHz
 static const char *const n_bcast_step[] = { "200 kHz", "100 kHz" };
 #endif
+#if CONFIG_AM_RX
+static const int16_t v_am_mode[] = { 0, 1, 2, 3, 4 };	// RADIO_AM_MODE_* (hal_radio.h)
+static const char *const n_am_mode[] = { "AM, auto AGC", "AM, AGC high", "AM, AGC mid", "Slope +1.6k", "AM enable bit" };
+#endif
 #if CONFIG_DUAL_WATCH
 static const int16_t v_dual_wait[] = { 500, 1000, 1500, 2000, 3000, 5000 };	// ms
 static const char *const n_dual_wait[] = { "0.5 s", "1 s", "1.5 s", "2 s", "3 s", "5 s" };
@@ -4043,6 +4047,9 @@ static const set_item_t s_talk[] = {
 #endif
 #if CONFIG_VFO && CONFIG_BCAST_FM
 	LIST("FM broadcast step", "VFO tuning radio station 200 kHz odd", UI_SET_BCAST_STEP, v_bcast_step, n_bcast_step),
+#endif
+#if CONFIG_AM_RX
+	LIST("AM demod", "air band airband aviation agc slope", UI_SET_AM_MODE, v_am_mode, n_am_mode),
 #endif
 	NUMBER("Mic gain", NULL, UI_SET_MIC_GAIN, 0, 10, 1, NULL),
 	TOGGLE("Mic AGC", "automatic gain level", UI_SET_MIC_AGC),
@@ -4178,6 +4185,8 @@ static bool set_hidden(const set_item_t *s)
 		return !(feats() & UI_FEAT_VOLUME);	// a knob sets the volume on the other radios
 	if (s->type != ST_ACTION && s->id == UI_SET_BCAST_STEP)
 		return !(feats() & UI_FEAT_BCAST);
+	if (s->type != ST_ACTION && s->id == UI_SET_AM_MODE)
+		return !(feats() & UI_FEAT_AM_MODE);
 	return !board_has_battery() && s->type != ST_ACTION &&
 	       (s->id == UI_SET_BATTERY_SAVER || s->id == UI_SET_LOW_BATTERY);
 }

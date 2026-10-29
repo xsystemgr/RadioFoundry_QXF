@@ -30,6 +30,18 @@
 #define FM_TX_LIMIT_25K		0x0Fu
 #define FD_REG_NOISE		0x65u
 #define FD_REG_RSSI		0x67u
+// AM (airband-and-broadcast.md 3.5, experimental): 0x7E is the AGC as on the BK4819 class, bit 15 a fixed gain, bits
+// 14:12 its index (3 the highest). The FM table writes 0x302E (automatic); the DMR table 0xB03F (fixed, index 3)
+#define FD_REG_AGC		0x7Eu
+#define FD_AGC_AUTO		0x302Eu
+#define FD_AGC_FIX_HIGH		0xB02Eu
+#define FD_AGC_FIX_MID		0x802Eu
+#define AM_SLOPE_HZ		1600u	// slope detection: the receiver this far above the carrier
+// RADIO_AM_MODE_ENABLE_BIT: an AM demodulator enable, bit 3 of 0x04 by one description of this chip family (not
+// confirmed on this radio, whose other registers don't all sit where that description puts them); read, modified,
+// written back, and cleared again on leaving AM
+#define FD_REG_AM_EN		0x04u
+#define FD_AM_EN_BIT		0x0008u
 
 static fd6818_t fd;
 static hrc7000_t modem;
@@ -48,7 +60,11 @@ static volatile uint16_t tx_drive;	// DAC B value for the transmission
 static uint16_t last_rssi_raw, last_noise_raw;
 static bool pcm_on;		// a beep or DMR voice plays through the codec
 static bool rx_audio;		// the squelch is open (the radio's audio hook)
-static bool rx_am_on;		// the FD6818 plays its AM demodulator (rx_am, the air band)
+static bool rx_am_on;		// AM asked for (rx_am): retune() comes back to it
+static bool af_am;		// the FD6818's AF output is on its AM demodulator (0x47)
+static uint16_t agc_word = FD_AGC_AUTO;	// what 0x7E holds now
+static uint8_t am_variant;	// RADIO_AM_MODE_* (am_mode)
+static bool am_en_bit;		// FD_AM_EN_BIT is set in FD_REG_AM_EN
 static bool asleep;		// the receiver is powered down between listen windows (rx_sleep)
 static bool aprs_listen;	// APRS takes the HR_C7000's FM audio (aprs_listen_route)
 static bool afsk_tx;		// APRS tones play through the prompt FIFO into the modulator (afsk_tx_route)
@@ -233,6 +249,12 @@ static void set_mode(radio_mode_t m)
 		mode = RADIO_MODE_FM;
 	}
 	rx_am_on = false;	// both mode tables write the FM AF word
+	af_am = false;
+	agc_word = mode == RADIO_MODE_DMR ? 0xB03Fu : FD_AGC_AUTO;	// and their own AGC word
+	if (am_en_bit) {	// the mode tables don't write it
+		fd6818_write(&fd, FD_REG_AM_EN, (uint16_t)(fd6818_read(&fd, FD_REG_AM_EN) & ~FD_AM_EN_BIT));
+		am_en_bit = false;
+	}
 	have_rx = false;	// the next rx() retunes everything
 }
 
@@ -245,12 +267,13 @@ static bool rx_tune(uint32_t hz, radio_bw_t bw, const subtone_t *tone, bool am)
 	wake();
 	pa_off();
 	lna(hz, true);
-	fd6818_set_freq(&fd, hz);
+	bool slope = am && am_variant == RADIO_AM_MODE_SLOPE;
+	fd6818_set_freq(&fd, slope ? hz + AM_SLOPE_HZ : hz);
 	if (mode == RADIO_MODE_DMR) {
 		fd6818_set_bandwidth(&fd, FD6818_BW_DMR);
 		fd6818_set_state(&fd, FD6818_STATE_RX);
 	} else {
-		fd6818_set_bandwidth(&fd, fm_bw_reg(bw));
+		fd6818_set_bandwidth(&fd, fm_bw_reg(slope ? RADIO_BW_25K : bw));
 		fd6818_set_state(&fd, FD6818_STATE_RX);
 		hrc_dac_b_power(false);
 		hrc7000_fm_rx(&modem, bw == RADIO_BW_25K);
@@ -258,10 +281,24 @@ static bool rx_tune(uint32_t hz, radio_bw_t bw, const subtone_t *tone, bool am)
 		// The FD6818 detects the tone on its own demodulated audio: the C7000's detector gets no audio while the
 		// FD6818 plays FM to the speaker (hardware-dm32.md 8.4)
 		fd6818_set_rx_tone(&fd, fd_tone(tone != NULL ? tone->type : TONE_NONE), tone != NULL ? tone->value : 0);
-		if (am != rx_am_on) {
-			fd6818_set_am(&fd, am);
-			rx_am_on = am;
+		bool enable_bit = am && am_variant == RADIO_AM_MODE_ENABLE_BIT;
+		if (enable_bit != am_en_bit) {
+			uint16_t r = fd6818_read(&fd, FD_REG_AM_EN);
+			fd6818_write(&fd, FD_REG_AM_EN, enable_bit ? (uint16_t)(r | FD_AM_EN_BIT) : (uint16_t)(r & ~FD_AM_EN_BIT));
+			am_en_bit = enable_bit;
 		}
+		bool want_af_am = am && !slope && !enable_bit;
+		if (want_af_am != af_am) {
+			fd6818_set_am(&fd, want_af_am);
+			af_am = want_af_am;
+		}
+		uint16_t agc = !am || am_variant == RADIO_AM_MODE_NATIVE || am_variant == RADIO_AM_MODE_ENABLE_BIT ? FD_AGC_AUTO :
+			       am_variant == RADIO_AM_MODE_AGC_MID ? FD_AGC_FIX_MID : FD_AGC_FIX_HIGH;
+		if (agc != agc_word) {
+			fd6818_write(&fd, FD_REG_AGC, agc);
+			agc_word = agc;
+		}
+		rx_am_on = am;
 	}
 	rx_hz = hz;
 	rx_bw = bw;
@@ -285,6 +322,19 @@ static bool rx(uint32_t hz, radio_bw_t bw, const subtone_t *tone)
 static bool rx_am(uint32_t hz, radio_bw_t bw)
 {
 	return rx_tune(hz, bw, NULL, true);
+}
+
+// Settings > Talk > AM demod (RADIO_AM_MODE_*): at once when AM is on
+static void am_mode(uint8_t m)
+{
+	if (m >= RADIO_AM_MODE_COUNT || m == am_variant) {
+		return;
+	}
+	am_variant = m;
+	if (rx_am_on && have_rx && !transmitting && !asleep && mode == RADIO_MODE_FM) {
+		subtone_t t = rx_tone;
+		rx_tune(rx_hz, rx_bw, &t, true);
+	}
 }
 #endif
 
@@ -567,6 +617,7 @@ const hal_radio_t dm32_radio = {
 	.rx_sleep = rx_sleep,
 #if CONFIG_AM_RX
 	.rx_am = rx_am,
+	.am_mode = am_mode,
 #endif
 	.status = status,
 	.audio = audio,

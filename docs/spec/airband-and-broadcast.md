@@ -70,6 +70,21 @@ FM channel or the VFO there is AM and TX is refused, but a board only tunes it w
 {225000000, 400000000, false}. Which radios do is in [feature-matrix.md](../feature-matrix.md) and their hardware pages;
 on most of these radios the band sits between the VHF and UHF front-end filters, so expect strong local signals only.
 
+### 3.5 AM demodulation variants (experimental)
+
+How the FD6818 demodulates AM is not settled (section 2), so a board may offer several ways (`hal_radio_t.am_mode`,
+`RADIO_AM_MODE_*`), chosen at Settings › Talk › AM demod (`radio_settings_t.am_mode`, stored in `settings_t.rs_am_mode`)
+and applied at once while AM plays. The row shows only on a board that has the hook (`UI_FEAT_AM_MODE`).
+
+| Setting | What the board does (DM-32UV) |
+|---|---|
+| AM, auto AGC (default) | AF output type AM (0x47 = 0x0740), the AGC automatic (0x7E = 0x302E): section 3.3 as before |
+| AM, AGC high / AGC mid | the same, the AGC fixed at index 3 (0x7E = 0xB02E, as the DMR table's 0xB03F) or index 0 (0x802E) |
+| Slope +1.6k | the FM demodulator 1.6 kHz above the carrier, the 25 kHz filter, the AGC fixed at index 3 |
+| AM enable bit | the receive AF output (0x47 = 0x0140) with bit 3 of 0x04 set (read, modified, written; cleared on leaving AM) |
+
+The one that gives clean AM on the air replaces the others.
+
 ## 4. Broadcast FM
 
 ### 4.1 A second receiver, chosen by the frequency

@@ -30,6 +30,7 @@ static struct {
 	uint32_t sig_hz;	// a signal on this frequency ...
 	int16_t sig_rssi;	// ... at this strength
 	bool am_refuse;		// rx_am returns false
+	int am_mode;		// the last am_mode() value, -1 = never called
 } hw;
 
 // The broadcast receiver: powered, tuned, its audio and volume, and a station at bc_sig_khz with bc_rssi
@@ -123,9 +124,10 @@ static void r_status(radio_status_t *st)
 	}
 }
 static void r_audio(bool on) { hw.audio = on; }
+static void r_am_mode(uint8_t m) { hw.am_mode = m; }
 static const hal_radio_t fake_radio = {
 	.init = r_init, .set_mode = r_set_mode, .rx = r_rx, .tx = r_tx, .tx_off = r_tx_off, .status = r_status,
-	.audio = r_audio, .rx_am = r_rx_am,
+	.audio = r_audio, .rx_am = r_rx_am, .am_mode = r_am_mode,
 };
 
 static void p_led(uint8_t which, bool on) { (void)which; (void)on; }
@@ -275,6 +277,7 @@ static void start(void)
 	ambeVoiceStop();
 	sim_reset();
 	memset(&hw, 0, sizeof(hw));
+	hw.am_mode = -1;
 	memset(&bc, 0, sizeof(bc));
 	setup_codeplug();
 	now = 1000;
@@ -413,6 +416,19 @@ static void test_am_flag_and_uhf(void)
 	req(RREQ_VFO_SET, 251900000);	// the VFO in the UHF air band
 	run(50);
 	CHECK(sm.view.vfo && sm.view.am && hw.rx_hz == 251900000);
+
+	// The AM demod setting: handed to the board at start and on a change, saved, a bad value clamped
+	CHECK(hw.am_mode == RADIO_AM_MODE_NATIVE);
+	radio_settings_t s = sm.set;
+	s.am_mode = RADIO_AM_MODE_SLOPE;
+	radio_sm_set_settings(&sm, &s, now);
+	CHECK(hw.am_mode == RADIO_AM_MODE_SLOPE && sm.set.am_mode == RADIO_AM_MODE_SLOPE);
+	settings_t st;
+	settings_read(&st);
+	CHECK(st.rs_am_mode == RADIO_AM_MODE_SLOPE + 1u);
+	s.am_mode = 9;
+	radio_sm_set_settings(&sm, &s, now);
+	CHECK(hw.am_mode == RADIO_AM_MODE_NATIVE && sm.set.am_mode == RADIO_AM_MODE_NATIVE);
 }
 
 static void test_tone_ignored(void)

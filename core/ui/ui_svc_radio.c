@@ -12,6 +12,7 @@
 #include "radio/mic_gain.h"
 #include "radio/radio_cwid.h"
 #include "radio/radio_bcast.h"
+#include "radio/radio_am.h"
 #include "input/input.h"
 #include "settings/settings.h"
 #include <string.h>
@@ -192,7 +193,8 @@ uint32_t ui_svc_feat_radio(void)
 	bool motor = CONFIG_VIBRATE && board.power != NULL && board.power->vibrate != NULL;
 	return (CONFIG_SCAN ? UI_FEAT_SCAN : 0) | (CONFIG_DMR_ROAMING ? UI_FEAT_ROAMING : 0) |
 	       (motor ? UI_FEAT_VIBRATE : 0) | (radio_volume_soft() ? UI_FEAT_VOLUME : 0) |
-	       (radio_bcast_capable() ? UI_FEAT_BCAST : 0);
+	       (radio_bcast_capable() ? UI_FEAT_BCAST : 0) |
+	       (CONFIG_AM_RX && radio_am_capable() && board.radio->am_mode != NULL ? UI_FEAT_AM_MODE : 0);
 }
 
 #if CONFIG_DMR
@@ -431,6 +433,11 @@ void ui_svc_apply(uint8_t id, int32_t value)
 #if CONFIG_BCAST_FM
 	case UI_SET_BCAST_STEP:
 		rs.bcast_step = value == 100 ? RADIO_BCAST_STEP_100 : RADIO_BCAST_STEP_200_ODD;
+		break;
+#endif
+#if CONFIG_AM_RX
+	case UI_SET_AM_MODE:	// the radio core clamps
+		rs.am_mode = (uint8_t)v16;
 		break;
 #endif
 #if CONFIG_DUAL_WATCH

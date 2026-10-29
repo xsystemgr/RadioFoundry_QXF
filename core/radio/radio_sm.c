@@ -4331,6 +4331,9 @@ static void clamp_settings(radio_settings_t *s)
 	if (s->bcast_step > RADIO_BCAST_STEP_100) {
 		s->bcast_step = RADIO_BCAST_STEP_200_ODD;
 	}
+	if (s->am_mode >= RADIO_AM_MODE_COUNT) {
+		s->am_mode = RADIO_AM_MODE_NATIVE;
+	}
 	if (s->roam_rssi_dbm < -125) {
 		s->roam_rssi_dbm = -125;
 	} else if (s->roam_rssi_dbm > -60) {
@@ -4399,6 +4402,10 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 		s->bcast_step = (uint8_t)(st->rs_bcast_step - 1u);
 		clamp_settings(s);
 	}
+	if (st->rs_am_mode != 0) {
+		s->am_mode = (uint8_t)(st->rs_am_mode - 1u);
+		clamp_settings(s);
+	}
 	if (st->rs_stored != 1) {
 		return;
 	}
@@ -4454,6 +4461,7 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 	st->rs_reply_s = s->reply_s;
 	st->rs_dual_delay = (uint8_t)(s->dual_delay_ms / 100u + 1u);
 	st->rs_bcast_step = (uint8_t)(s->bcast_step + 1u);
+	st->rs_am_mode = (uint8_t)(s->am_mode + 1u);
 	st->rs_stored = 1;
 	st->roam_rssi_dbm = s->roam_rssi_dbm;
 	st->roam_hyst_db = s->roam_hyst_db;
@@ -4477,6 +4485,11 @@ static void use_settings(radio_sm_t *sm, const radio_settings_t *s, uint32_t now
 	sm->set = *s;
 	clamp_settings(&sm->set);
 	apply_tot(sm);
+#if CONFIG_AM_RX
+	if (board.radio != NULL && board.radio->am_mode != NULL) {
+		board.radio->am_mode(sm->set.am_mode);	// the board retunes when AM is on
+	}
+#endif
 #if CONFIG_DMR_ROAMING
 	roam_cfg_t rc;
 	roam_cfg_of(&sm->set, &rc);
@@ -4663,6 +4676,11 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 	sm->base_squelch = RADIO_SQUELCH_DEFAULT;
 	sm->view.squelch = RADIO_SQUELCH_DEFAULT;
 	settings_to_radio(&st, &sm->set);	// as saved (docs/spec/settings-store.md 3)
+#if CONFIG_AM_RX
+	if (board.radio != NULL && board.radio->am_mode != NULL) {
+		board.radio->am_mode(sm->set.am_mode);	// before the first tune
+	}
+#endif
 #if CONFIG_DMR_ROAMING
 	roam_cfg_t rc;
 	roam_cfg_of(&sm->set, &rc);

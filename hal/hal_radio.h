@@ -9,6 +9,16 @@
 #include <stdbool.h>
 
 typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR } radio_mode_t;
+
+// hal_radio_t.am_mode (radio_settings_t.am_mode; airband-and-broadcast.md 3.5): the AF output type AM with the AGC
+// automatic, or fixed at a high or a middle gain index; slope detection (the FM demodulator 1.6 kHz off the carrier,
+// the 25 kHz filter, the AGC fixed); or an AM demodulator enable bit with the normal receive AF output
+#define RADIO_AM_MODE_NATIVE		0u
+#define RADIO_AM_MODE_AGC_HIGH		1u
+#define RADIO_AM_MODE_AGC_MID		2u
+#define RADIO_AM_MODE_SLOPE		3u
+#define RADIO_AM_MODE_ENABLE_BIT	4u
+#define RADIO_AM_MODE_COUNT		5u
 typedef enum { RADIO_BW_12K5, RADIO_BW_25K } radio_bw_t;
 
 typedef enum { TONE_NONE, TONE_CTCSS, TONE_DCS, TONE_DCS_INV } tone_type_t;
@@ -70,6 +80,9 @@ typedef struct {
 	// start, so any task may call it. NULL = no gain in the board's audio path: DMR then scales the samples before the
 	// vocoder and FM stays as it is
 	void (*mic_gain)(int8_t db);
+	// Optional (CAP_AM_RX, experimental): how rx_am() demodulates, RADIO_AM_MODE_* below (Settings > Talk > AM demod).
+	// The board applies it at once when AM is on, else at the next rx_am(). NULL = one way only
+	void (*am_mode)(uint8_t mode);
 } hal_radio_t;
 
 #endif

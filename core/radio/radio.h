@@ -81,6 +81,8 @@ typedef struct {
 	uint8_t sfr_cwid;	// our SFR repeater's CW ID interval: 0 off, 1 5 min, 2 10, 3 15, 4 30 (CONFIG_SFR_CWID)
 	// Broadcast FM (CONFIG_BCAST_FM)
 	uint8_t bcast_step;	// the VFO's automatic step there: RADIO_BCAST_STEP_200_ODD or RADIO_BCAST_STEP_100
+	// AM receive (CONFIG_AM_RX), experimental: the board's AM demodulation, RADIO_AM_MODE_*
+	uint8_t am_mode;	// RADIO_AM_MODE_* (hal_radio.h), for boards with hal_radio_t.am_mode
 } radio_settings_t;
 
 // radio_settings_t.bcast_step: 200 kHz between the odd tenths (88.1, 88.3 MHz: the broadcast channels of the

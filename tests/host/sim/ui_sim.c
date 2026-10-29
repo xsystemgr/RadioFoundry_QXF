@@ -1196,7 +1196,8 @@ static bool soft_volume;
 static bool bcast_rx;
 uint32_t ui_svc_features(void)
 {
-	return 0xFFFFFFFFu & ~(soft_volume ? 0 : UI_FEAT_VOLUME) & ~(bcast_rx ? 0 : UI_FEAT_BCAST);
+	// The experimental AM demod row (UI_FEAT_AM_MODE) stays out of the scripted flows
+	return 0xFFFFFFFFu & ~(soft_volume ? 0 : UI_FEAT_VOLUME) & ~(bcast_rx ? 0 : UI_FEAT_BCAST) & ~UI_FEAT_AM_MODE;
 }
 void ui_svc_boot_text(char line1[17], char line2[17])
 {
