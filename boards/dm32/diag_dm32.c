@@ -170,6 +170,28 @@ bool dm32_diag_line(uint8_t i, char *buf, uint8_t len)
 		}
 		break;
 #endif
+	case 12:	// AM bring-up: FD6818 registers read back while AM plays (airband-and-broadcast.md 3.5)
+	case 13: {
+		static const uint8_t regs[8] = DM32_AM_REGS;
+		dm32_radio_diag(&d);
+		if (!d.am_regs_valid) {
+			put(&o, i == 12 ? "am no readback yet" : "am -");
+			break;
+		}
+		if (i == 12) {
+			put(&o, "am v");
+			put_u(&o, d.am_variant);
+		} else {
+			put(&o, "am");
+		}
+		for (uint8_t k = (uint8_t)(i == 12 ? 0 : 4); k < (i == 12 ? 4 : 8); k++) {
+			put(&o, " ");
+			put_x(&o, regs[k], 2);
+			put(&o, "=");
+			put_x(&o, d.am_regs[k], 4);
+		}
+		break;
+	}
 	default:
 		return false;
 	}

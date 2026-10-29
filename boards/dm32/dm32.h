@@ -51,7 +51,13 @@ typedef struct {
 	uint16_t rssi_raw, noise_raw;	// FD6818 0x67 / 0x65 from the last status poll
 	uint16_t fm_noise;		// HR_C7000 FM_SQL
 	uint32_t fd_writes;
+	// AM bring-up (airband-and-broadcast.md 3.5): the FD6818 registers read back while AM plays, refreshed from
+	// status(); am_regs_valid false until the first read
+	bool am_regs_valid;
+	uint8_t am_variant;		// RADIO_AM_MODE_*
+	uint16_t am_regs[8];		// DM32_AM_REGS order
 } dm32_radio_diag_t;
+#define DM32_AM_REGS	{ 0x30, 0x31, 0x43, 0x47, 0x13, 0x4A, 0x7E, 0x37 }
 void dm32_radio_diag(dm32_radio_diag_t *d);
 bool dm32_diag_line(uint8_t i, char *buf, uint8_t len);
 void dm32_diag_reset(void);

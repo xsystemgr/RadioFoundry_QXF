@@ -68,6 +68,10 @@ static volatile bool dmr_keyed;		// DMR transmission on: the PA timer may key th
 static volatile bool tx_uhf;
 static volatile uint16_t tx_drive;	// DAC B value for the transmission
 static uint16_t last_rssi_raw, last_noise_raw;
+static const uint8_t am_reg_list[8] = DM32_AM_REGS;
+static uint16_t am_regs[8];	// read back while AM plays (dm32_radio_diag)
+static bool am_regs_valid;
+static uint8_t am_reg_tick;
 static bool pcm_on;		// a beep or DMR voice plays through the codec
 static bool rx_audio;		// the squelch is open (the radio's audio hook)
 static bool rx_am_on;		// AM asked for (rx_am): retune() comes back to it
@@ -491,6 +495,12 @@ static void status(radio_status_t *st)
 	st->noise = fd6818_noise(r65);	// the chip's floor lifted above the core's squelch levels (fd6818.h)
 	st->carrier = false;
 	st->tone_ok = mode != RADIO_MODE_FM || fd6818_rx_tone_ok(&fd, fd_tone(rx_tone.type));
+	if (rx_am_on && (am_reg_tick++ & 15u) == 0) {	// AM bring-up readback, now and then
+		for (uint8_t i = 0; i < sizeof am_reg_list; i++) {
+			am_regs[i] = fd6818_read(&fd, am_reg_list[i]);
+		}
+		am_regs_valid = true;
+	}
 }
 
 // The speaker hears one of two sources (PTB15, checked on the radio): 1 = the FD6818's audio output directly (FM
@@ -621,6 +631,13 @@ void dm32_radio_diag(dm32_radio_diag_t *d)
 	d->noise_raw = last_noise_raw;
 	d->fm_noise = hrc7000_fm_noise(&modem);
 	d->fd_writes = fd.writes;
+	d->am_regs_valid = am_regs_valid;
+#if CONFIG_AM_RX
+	d->am_variant = am_variant;
+#endif
+	for (uint8_t i = 0; i < 8; i++) {
+		d->am_regs[i] = am_regs[i];
+	}
 }
 
 // Receiver battery saving (FM receive only, the radio's own sequence: hardware-dm32.md 8.8): FD6818 idle with its
