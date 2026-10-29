@@ -4332,7 +4332,7 @@ static void clamp_settings(radio_settings_t *s)
 		s->bcast_step = RADIO_BCAST_STEP_200_ODD;
 	}
 	if (s->am_mode >= RADIO_AM_MODE_COUNT) {
-		s->am_mode = RADIO_AM_MODE_NATIVE;
+		s->am_mode = RADIO_AM_MODE_STOCK;
 	}
 	if (s->roam_rssi_dbm < -125) {
 		s->roam_rssi_dbm = -125;

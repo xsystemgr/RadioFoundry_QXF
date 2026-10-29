@@ -10,15 +10,17 @@
 
 typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR } radio_mode_t;
 
-// hal_radio_t.am_mode (radio_settings_t.am_mode; airband-and-broadcast.md 3.5): the AF output type AM with the AGC
-// automatic, or fixed at a high or a middle gain index; slope detection (the FM demodulator 1.6 kHz off the carrier,
-// the 25 kHz filter, the AGC fixed); or an AM demodulator enable bit with the normal receive AF output
-#define RADIO_AM_MODE_NATIVE		0u
-#define RADIO_AM_MODE_AGC_HIGH		1u
-#define RADIO_AM_MODE_AGC_MID		2u
-#define RADIO_AM_MODE_SLOPE		3u
-#define RADIO_AM_MODE_ENABLE_BIT	4u
-#define RADIO_AM_MODE_COUNT		5u
+// hal_radio_t.am_mode (radio_settings_t.am_mode; airband-and-broadcast.md 3.5): the radio's own firmware's AM set-up
+// (the default); the AF output type AM alone with the AGC automatic, or fixed at a high or a middle gain index; slope
+// detection (the FM demodulator 1.6 kHz off the carrier, the 25 kHz filter, the AGC fixed); or an AM demodulator
+// enable bit with the normal receive AF output
+#define RADIO_AM_MODE_STOCK		0u
+#define RADIO_AM_MODE_NATIVE		1u
+#define RADIO_AM_MODE_AGC_HIGH		2u
+#define RADIO_AM_MODE_AGC_MID		3u
+#define RADIO_AM_MODE_SLOPE		4u
+#define RADIO_AM_MODE_ENABLE_BIT	5u
+#define RADIO_AM_MODE_COUNT		6u
 typedef enum { RADIO_BW_12K5, RADIO_BW_25K } radio_bw_t;
 
 typedef enum { TONE_NONE, TONE_CTCSS, TONE_DCS, TONE_DCS_INV } tone_type_t;

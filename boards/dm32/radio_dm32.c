@@ -37,11 +37,21 @@
 #define FD_AGC_FIX_HIGH		0xB02Eu
 #define FD_AGC_FIX_MID		0x802Eu
 #define AM_SLOPE_HZ		1600u	// slope detection: the receiver this far above the carrier
-// RADIO_AM_MODE_ENABLE_BIT: an AM demodulator enable, bit 3 of 0x04 by one description of this chip family (not
-// confirmed on this radio, whose other registers don't all sit where that description puts them); read, modified,
-// written back, and cleared again on leaving AM
-#define FD_REG_AM_EN		0x04u
+// RADIO_AM_MODE_ENABLE_BIT: an AM demodulator enable, bit 3 of 0x31 (the radio's own firmware has routines that set
+// and clear it, unused in its AM path); read, modified, written back, and cleared again on leaving AM
+#define FD_REG_AM_EN		0x31u
 #define FD_AM_EN_BIT		0x0008u
+// RADIO_AM_MODE_STOCK: what the radio's own firmware writes for 108-136 MHz (its 049 build): the RF filter at its
+// narrowest (0x43 = 0x0048: firlpf_bw 1.7 kHz, wb 0), the AF output type AM (0x47 = 0x6740), the receive gain word at
+// its top (0x13 = 0x03FF) and 0x4A = 0x5450. Leaving AM, its FM path writes 0x13 = 0x037E back; 0x4A it never writes
+// back, RadioFoundry restores what it read
+#define FD_REG_GAIN		0x13u
+#define FD_GAIN_FM		0x037Eu	// the FM and DMR tables' word
+#define FD_GAIN_AM_STOCK	0x03FFu
+#define FD_BW_AM_STOCK		0x0048u
+#define FD_AF_AM_STOCK		0x6740u
+#define FD_REG_4A		0x4Au
+#define FD_4A_AM_STOCK		0x5450u
 
 static fd6818_t fd;
 static hrc7000_t modem;
@@ -61,8 +71,11 @@ static uint16_t last_rssi_raw, last_noise_raw;
 static bool pcm_on;		// a beep or DMR voice plays through the codec
 static bool rx_audio;		// the squelch is open (the radio's audio hook)
 static bool rx_am_on;		// AM asked for (rx_am): retune() comes back to it
-static bool af_am;		// the FD6818's AF output is on its AM demodulator (0x47)
+static uint16_t af_word = FD6818_AF_FM;	// what 0x47 holds now (the mode tables leave the FM word)
 static uint16_t agc_word = FD_AGC_AUTO;	// what 0x7E holds now
+static uint16_t gain_word = FD_GAIN_FM;	// what 0x13 holds now
+static bool r4a_changed;	// 0x4A holds FD_4A_AM_STOCK, r4a_saved what it held before
+static uint16_t r4a_saved;
 static uint8_t am_variant;	// RADIO_AM_MODE_* (am_mode)
 static bool am_en_bit;		// FD_AM_EN_BIT is set in FD_REG_AM_EN
 static bool asleep;		// the receiver is powered down between listen windows (rx_sleep)
@@ -249,8 +262,13 @@ static void set_mode(radio_mode_t m)
 		mode = RADIO_MODE_FM;
 	}
 	rx_am_on = false;	// both mode tables write the FM AF word
-	af_am = false;
-	agc_word = mode == RADIO_MODE_DMR ? 0xB03Fu : FD_AGC_AUTO;	// and their own AGC word
+	af_word = FD6818_AF_FM;
+	agc_word = mode == RADIO_MODE_DMR ? 0xB03Fu : FD_AGC_AUTO;	// and their own AGC and gain words
+	gain_word = FD_GAIN_FM;
+	if (r4a_changed) {	// the tables don't write 0x4A
+		fd6818_write(&fd, FD_REG_4A, r4a_saved);
+		r4a_changed = false;
+	}
 	if (am_en_bit) {	// the mode tables don't write it
 		fd6818_write(&fd, FD_REG_AM_EN, (uint16_t)(fd6818_read(&fd, FD_REG_AM_EN) & ~FD_AM_EN_BIT));
 		am_en_bit = false;
@@ -273,7 +291,8 @@ static bool rx_tune(uint32_t hz, radio_bw_t bw, const subtone_t *tone, bool am)
 		fd6818_set_bandwidth(&fd, FD6818_BW_DMR);
 		fd6818_set_state(&fd, FD6818_STATE_RX);
 	} else {
-		fd6818_set_bandwidth(&fd, fm_bw_reg(slope ? RADIO_BW_25K : bw));
+		bool stock = am && am_variant == RADIO_AM_MODE_STOCK;
+		fd6818_set_bandwidth(&fd, stock ? FD_BW_AM_STOCK : fm_bw_reg(slope ? RADIO_BW_25K : bw));
 		fd6818_set_state(&fd, FD6818_STATE_RX);
 		hrc_dac_b_power(false);
 		hrc7000_fm_rx(&modem, bw == RADIO_BW_25K);
@@ -287,16 +306,28 @@ static bool rx_tune(uint32_t hz, radio_bw_t bw, const subtone_t *tone, bool am)
 			fd6818_write(&fd, FD_REG_AM_EN, enable_bit ? (uint16_t)(r | FD_AM_EN_BIT) : (uint16_t)(r & ~FD_AM_EN_BIT));
 			am_en_bit = enable_bit;
 		}
-		bool want_af_am = am && !slope && !enable_bit;
-		if (want_af_am != af_am) {
-			fd6818_set_am(&fd, want_af_am);
-			af_am = want_af_am;
+		uint16_t af = stock ? FD_AF_AM_STOCK : am && !slope && !enable_bit ? FD6818_AF_AM : FD6818_AF_FM;
+		if (af != af_word) {
+			fd6818_write(&fd, FD6818_REG_AF, af);
+			af_word = af;
 		}
-		uint16_t agc = !am || am_variant == RADIO_AM_MODE_NATIVE || am_variant == RADIO_AM_MODE_ENABLE_BIT ? FD_AGC_AUTO :
+		uint16_t agc = !am || stock || am_variant == RADIO_AM_MODE_NATIVE || enable_bit ? FD_AGC_AUTO :
 			       am_variant == RADIO_AM_MODE_AGC_MID ? FD_AGC_FIX_MID : FD_AGC_FIX_HIGH;
 		if (agc != agc_word) {
 			fd6818_write(&fd, FD_REG_AGC, agc);
 			agc_word = agc;
+		}
+		uint16_t gain = stock ? FD_GAIN_AM_STOCK : FD_GAIN_FM;
+		if (gain != gain_word) {
+			fd6818_write(&fd, FD_REG_GAIN, gain);
+			gain_word = gain;
+		}
+		if (stock != r4a_changed) {
+			if (stock) {
+				r4a_saved = fd6818_read(&fd, FD_REG_4A);
+			}
+			fd6818_write(&fd, FD_REG_4A, stock ? FD_4A_AM_STOCK : r4a_saved);
+			r4a_changed = stock;
 		}
 		rx_am_on = am;
 	}

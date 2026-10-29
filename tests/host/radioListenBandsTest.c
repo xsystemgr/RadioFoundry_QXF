@@ -418,7 +418,7 @@ static void test_am_flag_and_uhf(void)
 	CHECK(sm.view.vfo && sm.view.am && hw.rx_hz == 251900000);
 
 	// The AM demod setting: handed to the board at start and on a change, saved, a bad value clamped
-	CHECK(hw.am_mode == RADIO_AM_MODE_NATIVE);
+	CHECK(hw.am_mode == RADIO_AM_MODE_STOCK);
 	radio_settings_t s = sm.set;
 	s.am_mode = RADIO_AM_MODE_SLOPE;
 	radio_sm_set_settings(&sm, &s, now);
@@ -428,7 +428,7 @@ static void test_am_flag_and_uhf(void)
 	CHECK(st.rs_am_mode == RADIO_AM_MODE_SLOPE + 1u);
 	s.am_mode = 9;
 	radio_sm_set_settings(&sm, &s, now);
-	CHECK(hw.am_mode == RADIO_AM_MODE_NATIVE && sm.set.am_mode == RADIO_AM_MODE_NATIVE);
+	CHECK(hw.am_mode == RADIO_AM_MODE_STOCK && sm.set.am_mode == RADIO_AM_MODE_STOCK);
 }
 
 static void test_tone_ignored(void)

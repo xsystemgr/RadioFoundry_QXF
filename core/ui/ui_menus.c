@@ -3971,8 +3971,9 @@ static const int16_t v_bcast_step[] = { 200, 100 };	// kHz
 static const char *const n_bcast_step[] = { "200 kHz", "100 kHz" };
 #endif
 #if CONFIG_AM_RX
-static const int16_t v_am_mode[] = { 0, 1, 2, 3, 4 };	// RADIO_AM_MODE_* (hal_radio.h)
-static const char *const n_am_mode[] = { "AM, auto AGC", "AM, AGC high", "AM, AGC mid", "Slope +1.6k", "AM enable bit" };
+static const int16_t v_am_mode[] = { 0, 1, 2, 3, 4, 5 };	// RADIO_AM_MODE_* (hal_radio.h)
+static const char *const n_am_mode[] = { "Baofeng stock", "AF type only", "AF, AGC high", "AF, AGC mid", "Slope +1.6k",
+					 "AM enable bit" };
 #endif
 #if CONFIG_DUAL_WATCH
 static const int16_t v_dual_wait[] = { 500, 1000, 1500, 2000, 3000, 5000 };	// ms

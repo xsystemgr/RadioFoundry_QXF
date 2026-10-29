@@ -78,12 +78,14 @@ and applied at once while AM plays. The row shows only on a board that has the h
 
 | Setting | What an FD6818 board does |
 |---|---|
-| AM, auto AGC (default) | AF output type AM (0x47 = 0x0740), the AGC automatic (0x7E = 0x302E): section 3.3 as before |
-| AM, AGC high / AGC mid | the same, the AGC fixed at index 3 (0x7E = 0xB02E, as the DMR table's 0xB03F) or index 0 (0x802E) |
+| Baofeng stock (default) | what the radio's own firmware writes for 108-136 MHz (read from its 049 image: a frequency check against those limits, then one set-up routine): the RF filter at its narrowest, 0x43 = 0x0048 (firlpf_bw 1.7 kHz, wb 0); AF output type AM, 0x47 = 0x6740; the receive gain word at its top, 0x13 = 0x03FF; 0x4A = 0x5450. Leaving AM: 0x13 = 0x037E as its FM path does, 0x4A as read before |
+| AF type only | AF output type AM (0x47 = 0x0740), everything else FM: section 3.3 as first written |
+| AF, AGC high / AGC mid | the same, the AGC fixed at index 3 (0x7E = 0xB02E, as the DMR table's 0xB03F) or index 0 (0x802E) |
 | Slope +1.6k | the FM demodulator 1.6 kHz above the carrier, the 25 kHz filter, the AGC fixed at index 3 |
-| AM enable bit | the receive AF output (0x47 = 0x0140) with bit 3 of 0x04 set (read, modified, written; cleared on leaving AM) |
+| AM enable bit | the receive AF output (0x47 = 0x0140) with bit 3 of 0x31 set (the radio's own firmware has routines that set and clear it, not called from its AM path) |
 
-The one that gives clean AM on the air replaces the others.
+The narrow filter of the stock set-up passes about ±1.7 kHz: a radio whose frequency is off by more than a few hundred
+Hz (calibration) clips the audio. The one that gives clean AM on the air replaces the others.
 
 ## 4. Broadcast FM
 
