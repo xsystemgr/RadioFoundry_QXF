@@ -63,7 +63,7 @@ A (chip 1), PD8 receiver B (chip 0) (image):
 So in FM both receivers can be heard at once (both switches on); in DMR only one receiver feeds the line, since the one
 HR_C6000 decodes one signal (inferred from the switch levels; what is heard is checked on the radio).
 On the MD-UV380 PD9 is the RX audio mux and PD8 the LCD backlight; on the MD-2017 PD8 is this switch, so the backlight
-is on another pin (?: R4). The same routine writes PC4, PC5 and PC6 low (PC6 is the PA band select on the MD-UV380,
+is on PE4 (3.1). The same routine writes PC4, PC5 and PC6 low (PC6 is the PA band select on the MD-UV380,
 PC5 in its TX path).
 
 ### 2.2 Front-end supplies per receiver
@@ -107,15 +107,31 @@ From every GPIO_Init (mode), GPIO_PinAFConfig (alternate function) and read / wr
 | PC4, PC5 | out | APC enable, TX supply | same |
 | PC6 | out | PA band select | same (written low in RX) |
 | PC7, PC8 | AF3 TIM8 | CTCSS / beep PWM | same |
-| PC13 | out | — | new (?) |
+| PC13 | out | — | **HR_C6000 control SPI clock** (3.1) |
 | PD0, PD1, PD4, PD5, PD12, PD14, PD15, PE7-PE10 | AF12 FSMC | LCD bus | same |
 | PD6, PD13 | out | LCD CS, LCD reset | same |
-| PD8 / PD9 | out, opposite levels | backlight / RX audio mux | **receiver switch B / A** (2.1); the backlight is elsewhere (?) |
+| PD8 / PD9 | out, opposite levels | backlight / RX audio mux | **receiver switch B / A** (2.1); the backlight is PE4 |
 | PD10, PD11 | in, read | — | new inputs (a second knob? ?) |
 | PE0, PE1 | out | LEDs | same |
-| PE2-PE6 | out / in | HR_C6000 control SPI, PWD | same pins (the directions not all decoded yet) |
+| PE2 | out | C6000 CS | same |
+| PE3 / PE5 | in / out | C6000 CLK / MISO | **C6000 MISO / MOSI** (3.1) |
+| PE4 | out | C6000 MOSI | **LCD backlight** (3.1) |
+| PE6 | out | C6000 PWD | same (?) |
 | PE11, PE12 | in pull-up | PTT, external PTT | same |
 | PE13, PE15 | in pull-up | — | new inputs (keys? ?) |
+
+### 3.1 Backlight, HR_C6000 control bus, inputs
+
+| Item | What the image does |
+|---|---|
+| LCD backlight: **PE4** | set high from many places (key and screen activity, 31 call sites); a tick routine counts a RAM counter down while a settings byte enables the time-out, and drives PE4 low when it reaches 0. Plain on / off: no TIM or DMA writes a GPIO register in the image, so no PWM dimming was found (image) |
+| HR_C6000 control SPI, bit-banged | **CS PE2** (low around each transfer, inside a mutex), **CLK PC13**, **MOSI PE5**, **MISO PE3** (input); 8 bits MSB first, data out set before the clock edge, data in read after it. The register write (0x0804BC80: 0x04, register, value) and the other C6000 accesses go through it (image). On the MD-UV380 this bus is CLK PE3, MOSI PE4, MISO PE5, so the MD-2017 board needs its own pins here |
+| PE6 | written (the MD-UV380's C6000 power-down pin; same role assumed, ?) |
+| PE15, PB10 | read in the same routine as the channel encoder (PE14, PB11), each into its own RAM byte: a second two-pin input next to the encoder (?) |
+| PD10, PD11 | read as a pair and compared as a 2-bit state (`& 3`): quadrature-like (?) |
+| PA13, PE13 | each read three times in a row and compared: debounced keys (?) |
+| PB0, PB1 | inputs read in one menu path (?) |
+| PB2 | output, written in the RX / TX switching (?) |
 
 ## 4. Open questions (next steps)
 
@@ -124,7 +140,7 @@ From every GPIO_Init (mode), GPIO_PinAFConfig (alternate function) and read / wr
 | R1 | ~~The receivers' audio~~: PD9 A, PD8 B, both on in FM (2.3); confirm on the radio | |
 | R2 | ~~DMR input~~: the selected receiver alone, either one (2.3); confirm on the radio | |
 | R3 | ~~Each receiver's band supplies~~: done (2.2) | |
-| R4 | The pins marked (?) in section 3: the backlight, PA13, PA15, PB0-PB2, PB10, PC13, PD10, PD11, PE13, PE15 | the code reading or writing each one; then on the radio |
+| R4 | ~~Backlight and the C6000 bus~~: PE4, and CS PE2 / CLK PC13 / MOSI PE5 / MISO PE3 (3.1). Still (?): PA13, PA15, PB0-PB2, PB10, PD10, PD11, PE13, PE15 (keys and a second knob likely) | on the radio, with a pin-state readout |
 | R5 | The codec windows of V4.05 for rfoundry (a profile in `stockfw.PROFILES`) | the first code word 0x4FF0E92D is a common prologue, so it doesn't locate the codec alone. The codec's tables are the MD-UV380 library's, moved: one MD-UV380 vendor file listed in [codec-mduv380.md](codec-mduv380.md) as a reference finds them in V4.05 by content, then the code window by the table island's references; the emulator check of the MD-UV380 pages confirms the windows |
 | R6 | Bootloader entry keys and DFU loader (expected the MD-UV380's: PTT and the top side key at power on) | on the radio |
 
