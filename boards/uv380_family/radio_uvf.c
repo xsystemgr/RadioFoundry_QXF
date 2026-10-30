@@ -643,11 +643,30 @@ static void rb_supply(bool on, bool uhf)
 	PIN_WRITE(PIN_RXB_VHF_5V, on && !uhf);
 }
 
+// Both chips' audio outputs reach the shared line, whatever PD8 / PD9 do (bench 2026-10-30: in dual watch receiver
+// B's noise covered A's voice, single receive was clean). Reg 0x30 bit 7 mutes a chip's audio output (the TYT image
+// sets it on the receiver it doesn't play, clears it on the one it does; with it set on A in DMR the HR_C6000 lost
+// the baseband): receiver B is muted unless it plays, receiver A only while B plays
+#define RF_AF_MUTE		0x0080u
+
+static void rb_mute_apply(void)
+{
+	if (rb.tuned) {
+		uint16_t v = at1846s_state_value(rf_bw((radio_bw_t)rb.t.bw), AT1846S_STATE_RX);
+		count(at1846s_write_force(&rb.rf, 0, 0x30, rb.play ? v : (uint16_t)(v | RF_AF_MUTE)));
+	}
+	if (r.mode == RADIO_MODE_FM && r.rx_valid && !r.tx_on && !r.asleep) {
+		uint16_t v = (uint16_t)(at1846s_state_value(rf_bw(r.rx_bw), AT1846S_STATE_RX) | r.rf.rx_extra);
+		count(at1846s_write_force(&r.rf, 0, 0x30, rb.play ? (uint16_t)(v | RF_AF_MUTE) : v));
+	}
+}
+
 static void rb_play_update(void)
 {
 	bool play = rb.audio_on && rb.open && rb.tuned;
 	if (play != rb.play) {
 		rb.play = play;
+		rb_mute_apply();
 		speaker_apply();
 	}
 }
@@ -697,6 +716,7 @@ static bool rb_tune(const rx2_tune_t *t)
 	rb.open = false;
 	rb.close_count = 0;
 	rb_play_update();
+	rb_mute_apply();	// B muted until it plays
 	return ok;
 }
 
@@ -986,6 +1006,11 @@ static bool rx(uint32_t hz, radio_bw_t bw, const subtone_t *rx_tone)
 	count(at1846s_set_freq(&r.rf, hz));
 	apply_rx_tone();
 	count(at1846s_set_state(&r.rf, AT1846S_STATE_RX));
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+	if (rb.play) {
+		rb_mute_apply();	// receiver B plays: A stays muted
+	}
+#endif
 	r.rf_tuned_hz = hz;
 	r.rf_isr_dirty = false;
 	r.rf_rx_pending = false;
