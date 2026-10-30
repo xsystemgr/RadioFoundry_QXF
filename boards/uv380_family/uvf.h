@@ -65,6 +65,7 @@ extern const hal_audio_t uvf_audio;
 #if UVF_MD2017 && CONFIG_DUAL_WATCH
 // The MD-2017's receiver B as dual watch's second receiver (radio_uvf.c; FM only)
 extern const hal_rx2_t uvf_rx2;
+void uvf_rx2_diag(char *buf, uint8_t len);	// one diagnostics line on receiver B
 #endif
 
 #if CONFIG_AUDIO_PROBE || CONFIG_NET_USRP || CONFIG_APRS_RX

@@ -60,7 +60,16 @@ static bool diag_line(uint8_t i, char *buf, uint8_t len)
 	};
 	const uint8_t per = 4, count = sizeof in / sizeof in[0];
 	uint8_t n = 0;
-	if (len < 2u || i * per >= count) {
+	if (len < 2u) {
+		return false;
+	}
+#if CONFIG_DUAL_WATCH
+	if (i == (count + per - 1u) / per) {
+		uvf_rx2_diag(buf, len);	// receiver B, after the pin lines
+		return true;
+	}
+#endif
+	if (i * per >= count) {
 		return false;
 	}
 	for (uint8_t k = i * per; k < count && k < (i + 1u) * per; k++) {

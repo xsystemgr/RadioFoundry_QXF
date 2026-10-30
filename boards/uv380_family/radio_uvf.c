@@ -784,6 +784,37 @@ static void rb_poll(void)
 	rb_play_update();
 }
 
+// Diagnostics: "B t1 o0 p0 a0 -118dBm n65 f6000 swA1B0": tuned, squelch open, playing, the core's audio, the last
+// reading, and the two audio switches as they are (PD9 A, PD8 B)
+void uvf_rx2_diag(char *buf, uint8_t len)
+{
+	static const char hex[] = "0123456789ABCDEF";
+	char t[48];
+	int n = 0;
+	int16_t dbm = rb.tuned ? rb_rssi_dbm() : -140;
+	t[n++] = 'B'; t[n++] = ' ';
+	t[n++] = 't'; t[n++] = rb.tuned ? '1' : '0'; t[n++] = ' ';
+	t[n++] = 'o'; t[n++] = rb.open ? '1' : '0'; t[n++] = ' ';
+	t[n++] = 'p'; t[n++] = rb.play ? '1' : '0'; t[n++] = ' ';
+	t[n++] = 'a'; t[n++] = rb.audio_on ? '1' : '0'; t[n++] = ' ';
+	t[n++] = '-';
+	int v = dbm < 0 ? -dbm : dbm;
+	if (v >= 100) t[n++] = (char)('0' + v / 100);
+	t[n++] = (char)('0' + v / 10 % 10); t[n++] = (char)('0' + v % 10);
+	t[n++] = ' '; t[n++] = 'n';
+	t[n++] = (char)('0' + rb.noise / 100); t[n++] = (char)('0' + rb.noise / 10 % 10); t[n++] = (char)('0' + rb.noise % 10);
+	t[n++] = ' '; t[n++] = 'f';
+	for (int k = 12; k >= 0; k -= 4) t[n++] = hex[(rb.flags >> k) & 0xF];
+	t[n++] = ' '; t[n++] = 's'; t[n++] = 'w'; t[n++] = 'A';
+	t[n++] = PIN_READ(PIN_RX_AUDIO_MUX) ? '1' : '0';
+	t[n++] = 'B';
+	t[n++] = PIN_READ(PIN_RXB_AUDIO) ? '1' : '0';
+	t[n] = '\0';
+	uint8_t i = 0;
+	for (; i + 1u < len && t[i] != '\0'; i++) buf[i] = t[i];
+	buf[i] = '\0';
+}
+
 const hal_rx2_t uvf_rx2 = {
 	.tune = rb_tune,
 	.stop = rb_stop,
