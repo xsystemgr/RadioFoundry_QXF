@@ -67,6 +67,7 @@ typedef struct {
 typedef struct {
 	bool on;
 	bool both;		// the radio hears both at once (two receivers); else it alternates and can miss a call
+	bool own;		// both panes report their own receiver now (the second one has its channel): two meters
 	uint8_t sel;		// the selected pane, 0 A or 1 B: PTT transmits on it, keys and quick settings act on it
 	uint8_t rx;		// the pane whose call is heard now, UI_DUAL_NONE (pane[].rx: every pane receiving)
 	uint8_t last;		// the pane the last call came in on, UI_DUAL_NONE

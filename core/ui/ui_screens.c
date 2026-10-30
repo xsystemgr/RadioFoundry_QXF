@@ -2041,6 +2041,36 @@ static void dual_activity(const radio_view_t *v, const ui_state_t *s, int y, int
 		gfx_text(sm, w - gfx_text_width(sm, buf), y, buf, ui_col.fg);
 		y += sm->h;
 		lines--;
+	} else if (d->own && lines >= 2) {
+		// Two receivers, each with its own channel: a meter per pane, always ("A ▮▮▮▮▮▯▯▯ -62"), green while
+		// that pane receives; the one not heard while both receive says "mute"
+		for (int i = 0; i < 2; i++) {
+			const ui_dual_pane_t *p = &d->pane[i];
+			color_t c = p->rx ? ui_col.rx : ui_col.dim;
+			int x = gfx_text(sm, 0, y, i ? "B" : "A", c) + sm->w;
+			sb_init(&b, buf, sizeof buf);
+			if (p->rx && !p->heard && d->pane[!i].rx)
+				sb_str(&b, "mute ");
+			sb_i32(&b, p->rssi_dbm);
+			int tw = gfx_text_width(sm, buf);
+			gfx_text(sm, w - tw, y, buf, p->rx ? ui_col.fg : ui_col.dim);
+			if (w - tw - sm->w - x >= 4 * sm->w)
+				draw_meter(x, y + sm->h / 4, w - tw - sm->w - x, sm->h / 2, p->rssi_dbm);
+			y += sm->h;
+			lines--;
+		}
+	} else if (d->own && lines == 1) {
+		// One line for both: "A ▮▮▮▮▯▯ B ▮▮▯▯▯▯", each half its pane's meter, the letter green while it receives
+		int half = w / 2;
+		for (int i = 0; i < 2; i++) {
+			const ui_dual_pane_t *p = &d->pane[i];
+			int x = gfx_text(sm, i * half, y, i ? "B" : "A", p->rx ? ui_col.rx : ui_col.dim) + sm->w / 2;
+			int mw = (i + 1) * half - x - (i ? 0 : sm->w);
+			if (mw >= 3 * sm->w)
+				draw_meter(x, y + sm->h / 4, mw, sm->h / 2, p->rssi_dbm);
+		}
+		y += sm->h;
+		lines--;
 	} else if (d->pane[0].rx && d->pane[1].rx && lines == 1) {
 		gfx_text(sm, 0, y, "Receiving on A and B", ui_col.rx);	// two receivers, a call on each
 		y += sm->h;

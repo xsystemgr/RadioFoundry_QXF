@@ -1059,6 +1059,10 @@ __attribute__((noinline)) bool ui_dual_tick(const radio_view_t *v, uint32_t now)
 	static ui_dual_rx_t r[2];	// static: not on the UI task's stack
 	memset(r, 0, sizeof r);
 	bool own = d->both && ui_svc_dual_rx(0, &r[0]) && ui_svc_dual_rx(1, &r[1]);
+	if (own != d->own) {
+		d->own = own;
+		dirty = true;
+	}
 	if (!own) {
 		memset(r, 0, sizeof r);
 		uint8_t t = v->state == RS_RX ? tuned_pane(v) : UI_DUAL_NONE;

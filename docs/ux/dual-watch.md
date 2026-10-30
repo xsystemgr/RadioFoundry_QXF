@@ -99,9 +99,12 @@ selected one marked with an arrow at its left, green while a call comes in on it
 
 ### 3.1 Two receivers
 
-With `ui_svc_receivers()` > 1, both panes can receive at once, each with its caller and RX pill. Under the panes there is
-a line per receiving pane: "Receiving on A" with its meter, and "Receiving on B, muted" for the one that is not
-heard; where there is room for one line only, "Receiving on A and B". The strip says RX. Gallery: `home_dual_two_rx`,
+With `ui_svc_receivers()` > 1, both panes can receive at once, each with its caller and RX pill. While each pane has
+its own receiver (the second one has its channel: `ui_dual_t.own`), under the panes there is a meter per pane, always,
+quiet or not: "A" and "B" with the meter and the level in dBm, green while that pane receives, and "mute" on the
+one not heard while both receive; where there is room for one line only, both meters share it, half each ("A ▮▮▮▯ B
+▮▯▯▯"). Before the second receiver has its channel, a line per receiving pane: "Receiving on A" with its meter, and
+"Receiving on B, muted" for the one that is not heard; one line only: "Receiving on A and B". The strip says RX. Gallery: `home_dual_two_rx`,
 `home_dual_two_rx_large_text`. The simulator has `receivers:2`, `rxa:` / `rxb:` and the `rxaend` / `rxbend` tokens; uiFlowTest
 checks a call on each, one ending (the other is then the one heard, and the ended call is listed), and talking on B.
 

@@ -2216,6 +2216,7 @@ static bool run_token(char *t, char *err, size_t len)
 	}
 	if (strcmp(t, "receivers") == 0 && arg != NULL) {
 		sim_receivers = (uint8_t)atoi(arg);
+		sim_drx[0].rssi_dbm = sim_drx[1].rssi_dbm = -118;	// the noise floor until a call comes in
 		return true;
 	}
 	if ((strcmp(t, "rxa") == 0 || strcmp(t, "rxb") == 0) && arg != NULL) {
@@ -2241,6 +2242,7 @@ static bool run_token(char *t, char *err, size_t len)
 	if (strcmp(t, "rxaend") == 0 || strcmp(t, "rxbend") == 0) {
 		ui_dual_rx_t *x = &sim_drx[t[2] == 'b'], *o = &sim_drx[t[2] != 'b'];
 		x->active = x->heard = false;
+		x->rssi_dbm = -118;
 		o->heard = o->active;	// the other call's audio now
 		changed();
 		advance(300);
