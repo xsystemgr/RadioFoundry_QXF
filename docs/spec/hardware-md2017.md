@@ -126,6 +126,16 @@ them and the TX supplies (PC4, PC5) low (image):
 All four band combinations occur (A UHF + B VHF: PC9 and PA2, and so on), so the two receivers can sit in different
 bands. On the MD-UV380, PA2 / PA5 are its one receiver's UHF / VHF supplies and PA8 / PC9 are the AT1846S I2C pins.
 
+### 2.4 What runs (2026-10-30)
+
+| Function | State |
+|---|---|
+| FM receive, VHF and UHF (receiver A) | works on the radio |
+| DMR receive through a repeater | works on the radio (the V4.05 codec, merged by rfoundry) |
+| DMR receive in direct mode (DMO) | not yet: bursts are found, calls don't open (open) |
+| FM and DMR transmit | works on the radio (MD2017_TX on by default since) |
+| Dual watch with both receivers | FM: receiver B (0x71) takes the channel not selected (hal_rx2_t `uvf_rx2`, radio_uvf.c): its own supplies (PA8 / PA2), its audio on PD8 while A's (PD9) is off, its squelch on the main receiver's scale, polled with the main status; the core gives it the speaker while the selected channel is quiet. A DMR side is refused, so dual watch alternates there (the one HR_C6000 decodes one channel). Untested on the radio |
+
 ## 3. Pin map against the MD-UV380
 
 From every GPIO_Init (mode), GPIO_PinAFConfig (alternate function) and read / write call in the image (image).

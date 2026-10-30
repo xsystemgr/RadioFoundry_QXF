@@ -13,6 +13,7 @@
 // on-air measurement found no offset, so UVF_TX_OFFSET_HZ_* default to 0. Measure the carrier with this exact
 // sequence and put the measured correction there; do not copy the +3 kHz of the other sequence.
 #include <stddef.h>
+#include <string.h>
 #include "config.h"
 #include "uvf.h"
 #include "pins.h"
@@ -23,6 +24,10 @@
 #include "modem/hrc_common/hrc6000_dmr.h"
 #include "hrc/hrc_bus.h"
 #include "dmr_uvf.h"
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+#include "hal_rx2.h"
+#include "radio/radio_sm.h"	// radio_sm_squelch_open_below: receiver B's squelch is the main receiver's scale
+#endif
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
@@ -85,6 +90,26 @@ static struct {
 	uint32_t rf_skipped, rf_unarmed, rf_rx_retries;
 } r = { .rf_page = 0xFF };
 
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+// Receiver B (hardware-md2017.md 2): the AT1846S at 0x71, receive only, as the second receiver of dual watch
+// (hal_rx2.h). FM only: its audio reaches the speaker through the same HR_C6000 FM feed-through as receiver A's
+// (PD8 switches it onto the shared line, PD9 switches A off meanwhile), so it plays only while the main receiver is
+// in FM too; a DMR channel (either side) is refused and dual watch alternates as on a one-receiver radio
+static struct {
+	at1846s_t rf;
+	bool up;		// initialized
+	bool tuned;		// on t's settings
+	bool open;		// squelch open (and the RX tone, if any)
+	bool audio_on;		// the core gives it the speaker
+	bool play;		// its audio on the line now (audio_on and open)
+	bool uhf;
+	uint8_t close_count;
+	rx2_tune_t t;
+	uint8_t rssi, noise;
+	uint16_t flags;
+} rb;
+#endif
+
 static I2C_HandleTypeDef i2c3;
 static DAC_HandleTypeDef dac;
 
@@ -121,7 +146,7 @@ static void i2c_setup(void)
 
 // One register transfer. Task context: up to 3 tries 1 ms apart, then the peripheral is reset. ISR context: one
 // try, and none at all while a task transfer owns the bus (skip, never wait)
-static bool i2c_xfer(uint8_t reg, uint8_t *buf, bool write)
+static bool i2c_xfer_at(uint8_t addr, uint8_t reg, uint8_t *buf, bool write)
 {
 	bool isr = in_isr();
 	int tries = isr ? 1 : I2C_TRIES;
@@ -130,8 +155,8 @@ static bool i2c_xfer(uint8_t reg, uint8_t *buf, bool write)
 			return false;
 		}
 		HAL_StatusTypeDef st = write
-			? HAL_I2C_Mem_Write(&i2c3, AT1846S_I2C_ADDR << 1, reg, I2C_MEMADD_SIZE_8BIT, buf, 2, I2C_TIMEOUT_MS)
-			: HAL_I2C_Mem_Read(&i2c3, AT1846S_I2C_ADDR << 1, reg, I2C_MEMADD_SIZE_8BIT, buf, 2, I2C_TIMEOUT_MS);
+			? HAL_I2C_Mem_Write(&i2c3, (uint16_t)(addr << 1), reg, I2C_MEMADD_SIZE_8BIT, buf, 2, I2C_TIMEOUT_MS)
+			: HAL_I2C_Mem_Read(&i2c3, (uint16_t)(addr << 1), reg, I2C_MEMADD_SIZE_8BIT, buf, 2, I2C_TIMEOUT_MS);
 		if (st == HAL_OK) {
 			return true;
 		}
@@ -145,6 +170,11 @@ static bool i2c_xfer(uint8_t reg, uint8_t *buf, bool write)
 		i2c_setup();
 	}
 	return false;
+}
+
+static bool i2c_xfer(uint8_t reg, uint8_t *buf, bool write)
+{
+	return i2c_xfer_at(AT1846S_I2C_ADDR, reg, buf, write);
 }
 
 static bool rf_write(void *ctx, uint8_t reg, uint16_t val)
@@ -183,6 +213,27 @@ static bool rf_read(void *ctx, uint8_t reg, uint16_t *val)
 }
 
 static const at1846s_bus_t rf_bus = { .write = rf_write, .read = rf_read, .delay_ms = hal_delay_ms, .ctx = NULL };
+
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+// Receiver B's bus: the same I2C, its own address, task context only (the modem ISRs never touch it)
+static bool rfb_write(void *ctx, uint8_t reg, uint16_t val)
+{
+	uint8_t buf[2] = { (uint8_t)(val >> 8), (uint8_t)val };
+	return i2c_xfer_at(AT1846S_B_I2C_ADDR, reg, buf, true);
+}
+
+static bool rfb_read(void *ctx, uint8_t reg, uint16_t *val)
+{
+	uint8_t buf[2];
+	if (!i2c_xfer_at(AT1846S_B_I2C_ADDR, reg, buf, false)) {
+		return false;
+	}
+	*val = (uint16_t)((buf[0] << 8) | buf[1]);
+	return true;
+}
+
+static const at1846s_bus_t rfb_bus = { .write = rfb_write, .read = rfb_read, .delay_ms = hal_delay_ms, .ctx = NULL };
+#endif
 
 // --- HR_C6000 bus: bit-banged config SPI on PE2-PE5 (hardware-dm1701.md 4.2); the MD-2017's clock is PC13 ---
 
@@ -542,7 +593,12 @@ static void speaker_apply(void)
 		xSemaphoreTake(speaker_lock, portMAX_DELAY);
 	}
 	bool pcm = pcm_wanted;
-	bool fm = audio_wanted && !pcm;
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+	bool b = rb.play && !pcm && r.mode == RADIO_MODE_FM;	// receiver B on the line instead of A
+#else
+	bool b = false;
+#endif
+	bool fm = (audio_wanted || b) && !pcm;
 	bool on = (fm || pcm) && !volume_zero;
 	// The FM feed-through also gates the FM audio on the I2S stream that APRS receive reads (hardware-dm1701.md
 	// 21.3.1), so it follows the core's request, not the knob: at volume zero only the amp is off
@@ -551,7 +607,13 @@ static void speaker_apply(void)
 		if (pcm) {
 			pcm_codec_on();
 		}
+#if UVF_MD2017
+		PIN_WRITE(PIN_RXB_AUDIO, b);		// receiver B's audio, and A's off meanwhile
+		PIN_WRITE(PIN_RX_AUDIO_MUX, !b);
+#else
+		(void)b;
 		PIN_WRITE(PIN_RX_AUDIO_MUX, true);	// HR_C6000 line out to the amp
+#endif
 		PIN_WRITE(PIN_AMP_EN, true);
 		PIN_WRITE(PIN_SPK_MUTE, false);
 	} else {
@@ -568,6 +630,138 @@ static void audio(bool on)
 	audio_wanted = on;
 	speaker_apply();
 }
+
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+// --- Receiver B as dual watch's second receiver (hal_rx2.h) ---
+
+static void rb_supply(bool on, bool uhf)
+{
+	PIN_WRITE(PIN_RXB_UHF_5V, on && uhf);
+	PIN_WRITE(PIN_RXB_VHF_5V, on && !uhf);
+}
+
+static void rb_play_update(void)
+{
+	bool play = rb.audio_on && rb.open && rb.tuned;
+	if (play != rb.play) {
+		rb.play = play;
+		speaker_apply();
+	}
+}
+
+// Power-up: initialized and off, so the second chip never sits in an unknown state
+static void rb_init(void)
+{
+	at1846s_attach(&rb.rf, &rfb_bus);
+	rb.up = at1846s_init(&rb.rf) && at1846s_init_finish(&rb.rf) && at1846s_set_mode(&rb.rf, AT1846S_MODE_FM) &&
+		at1846s_set_state(&rb.rf, AT1846S_STATE_OFF);
+	rb_supply(false, false);
+	PIN_WRITE(PIN_RXB_AUDIO, false);
+}
+
+static bool rb_tune(const rx2_tune_t *t)
+{
+	if (!rb.up || t->mode != RADIO_MODE_FM || r.mode != RADIO_MODE_FM || find_band(t->rx_hz) == NULL) {
+		rb.tuned = false;	// a DMR side: the one HR_C6000 decodes one channel, so dual watch alternates
+		rb_play_update();
+		return false;
+	}
+	if (rb.tuned && memcmp(t, &rb.t, sizeof *t) == 0) {
+		return true;		// the core's refresh: nothing changed
+	}
+	bool uhf = t->rx_hz >= UHF_MIN_HZ;
+	uint16_t value;
+	at1846s_tone_t type = rf_tone(&t->rx_tone, &value);
+	rb_supply(true, uhf);
+	bool ok = at1846s_set_bandwidth(&rb.rf, rf_bw((radio_bw_t)t->bw)) &&
+		  at1846s_set_mode(&rb.rf, AT1846S_MODE_FM) && at1846s_set_freq(&rb.rf, t->rx_hz) &&
+		  at1846s_set_rx_tone(&rb.rf, type, value) && at1846s_set_state(&rb.rf, AT1846S_STATE_RX);
+	count(ok);
+	rb.t = *t;
+	rb.uhf = uhf;
+	rb.tuned = ok;
+	rb.open = false;
+	rb.close_count = 0;
+	rb_play_update();
+	return ok;
+}
+
+static void rb_stop(void)
+{
+	rb.tuned = false;
+	rb.open = false;
+	rb.audio_on = false;
+	rb_play_update();
+	if (rb.up) {
+		count(at1846s_set_state(&rb.rf, AT1846S_STATE_OFF));
+	}
+	rb_supply(false, false);
+}
+
+static int16_t rb_rssi_dbm(void)
+{
+	return rb.uhf ? (int16_t)(rb.rssi - 151) : (int16_t)(-164 + rb.rssi * 32 / 27);	// as receiver A (5.9)
+}
+
+static void rb_status(rx2_status_t *st)
+{
+	memset(st, 0, sizeof *st);
+	st->up = rb.up;
+	st->tuned = rb.tuned && r.mode == RADIO_MODE_FM;
+	st->active = rb.open;
+	st->heard = rb.play;
+	st->rssi_dbm = rb.tuned ? rb_rssi_dbm() : -140;
+	st->noise = rb.noise;
+}
+
+static void rb_audio(bool on)
+{
+	rb.audio_on = on;
+	rb_play_update();
+}
+
+// From the main receiver's status poll (the radio task): receiver B's signal, and its squelch on the main one's
+// scale with the same hysteresis; closing takes three polls in a row
+static void rb_poll(void)
+{
+	if (!rb.tuned || r.mode != RADIO_MODE_FM) {
+		if (rb.tuned && r.mode != RADIO_MODE_FM) {
+			rb.tuned = false;	// the main receiver went DMR: let the core fall back to alternating
+			rb_play_update();
+		}
+		return;
+	}
+	uint8_t rssi, noise;
+	uint16_t flags, value;
+	if (!at1846s_read_signal(&rb.rf, &rssi, &noise) || !at1846s_read_flags(&rb.rf, &flags)) {
+		return;
+	}
+	rb.rssi = rssi;
+	rb.noise = noise;
+	rb.flags = flags;
+	uint8_t sq = rb.t.squelch;
+	uint8_t below = radio_sm_squelch_open_below(sq);
+	bool tone = at1846s_tone_match(flags, rf_tone(&rb.t.rx_tone, &value));
+	bool opens = tone && (sq == 0 || noise < below);
+	bool holds = tone && (sq == 0 || noise < below + RADIO_SQL_HYST_DB);
+	if (!rb.open && opens) {
+		rb.open = true;
+		rb.close_count = 0;
+	} else if (rb.open && !holds && ++rb.close_count >= 3u) {
+		rb.open = false;
+	} else if (holds) {
+		rb.close_count = 0;
+	}
+	rb_play_update();
+}
+
+const hal_rx2_t uvf_rx2 = {
+	.tune = rb_tune,
+	.stop = rb_stop,
+	.status = rb_status,
+	.audio = rb_audio,
+};
+#endif
 
 #if CONFIG_DMR
 // Overrides the fallback in audio_uvf.c (hal_audio_t.speaker_pcm)
@@ -608,6 +802,9 @@ static void init(void)
 	hrc6000_attach(&r.modem, &modem_bus);
 	count(hrc6000_power_on_init(&r.modem, DMR_MIC_GAIN));
 	count(at1846s_init_finish(&r.rf));
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+	rb_init();
+#endif
 
 	r.mode = RADIO_MODE_FM;
 	count(at1846s_set_mode(&r.rf, AT1846S_MODE_FM));
@@ -861,6 +1058,9 @@ static void status(radio_status_t *st)
 	st->carrier = (flags & AT1846S_FLAG_SQ) != 0;
 	st->tone_ok = at1846s_tone_match(flags, type);
 	r.last_status = *st;
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+	rb_poll();
+#endif
 }
 
 // Soft volume (hardware-dm1701.md 11.2, 17): the knob's 0..100 % maps linearly to -31..+31 dB of HR_C6000 RX gain

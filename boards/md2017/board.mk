@@ -2,7 +2,7 @@
 # Copyright (c) 2026 The RadioFoundry Authors
 # TYT MD-2017 / Retevis RT82: STM32F405VG + HR_C6000 + two AT1846S (receiver A transceives, receiver B receives only),
 # the UV380 board family with its own pins (UVF_MD2017: boards/uv380_family/pins.h; docs/spec/hardware-md2017.md).
-# Bring-up: receiver A alone, transmit off unless MD2017_DEFS="-DMD2017_TX=1"
+# Receiver B is dual watch's second receiver (FM); MD2017_DEFS="-DMD2017_TX=0" builds a receive-only image
 PLATFORM   := stm32f4
 MCU        := stm32f405
 # The 8 MHz reference; the image starts at sector 3, where the bootloader starts it (the family's)

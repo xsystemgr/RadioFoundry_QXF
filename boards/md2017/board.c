@@ -2,8 +2,8 @@
 // Copyright (c) 2026 The RadioFoundry Authors
 // TYT MD-2017 / Retevis RT82: board descriptor, key map and what sets the radio apart in the UV380 family
 // (boards/uv380_family/uvf.h with UVF_MD2017, docs/spec/hardware-md2017.md). Bring-up: receiver A only, the UV380 family's
-// keypad, calibration and power tables until each is checked on the radio, and no transmit unless built with
-// MD2017_DEFS="-DMD2017_TX=1"
+// keypad, calibration and power tables until each is checked on the radio. Receiver B is dual watch's second
+// receiver for FM (radio_uvf.c, uvf_rx2)
 #include "board.h"
 #include "config.h"
 #include "../uv380_family/uvf.h"
@@ -19,9 +19,10 @@
 #include "hostlink/hostlink_ppp.h"
 #endif
 
-// The transmitter waits for the calibration and the TX path to be read on this radio (hardware-md2017.md 4)
+// Transmit: on since the first test on the radio (2026-10-30: FM and DMR out, the power steps as set);
+// MD2017_DEFS="-DMD2017_TX=0" builds a receive-only image
 #ifndef MD2017_TX
-#define MD2017_TX		0
+#define MD2017_TX		1
 #endif
 
 // The UV380 family's other radios' matrix, unconfirmed here: the keys pressed show on the diagnostics page
@@ -159,6 +160,9 @@ const board_t board = {
 	.side_key_names = side_key_names,
 	.side_key_count = sizeof(side_keys),
 	.radio = &uvf_radio,
+#if CONFIG_DUAL_WATCH
+	.rx2 = &uvf_rx2,	// receiver B: both FM channels of dual watch at once (radio_uvf.c)
+#endif
 	.power = &uvf_power,
 	.flash = &stm32_spi_flash,
 #if CONFIG_DIAG

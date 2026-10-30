@@ -62,6 +62,10 @@ extern const hal_input_t uvf_input;
 extern const hal_radio_t uvf_radio;
 extern const hal_power_t uvf_power;
 extern const hal_audio_t uvf_audio;
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+// The MD-2017's receiver B as dual watch's second receiver (radio_uvf.c; FM only)
+extern const hal_rx2_t uvf_rx2;
+#endif
 
 #if CONFIG_AUDIO_PROBE || CONFIG_NET_USRP || CONFIG_APRS_RX
 // The audio tap: FM receive audio on the PCM stream for APRS (CONFIG_APRS_RX) and USRP, FM transmit audio for USRP
