@@ -97,7 +97,9 @@ static struct {
 // in FM too; a DMR channel (either side) is refused and dual watch alternates as on a one-receiver radio
 static struct {
 	at1846s_t rf;
-	bool up;		// initialized
+	bool up;		// the second receiver is there (hal_rx2_t up)
+	bool started;		// rb_start has run (the chip initialized once)
+	bool chip_ok;		// ... and it answered
 	bool tuned;		// on t's settings
 	bool open;		// squelch open (and the RX tone, if any)
 	bool audio_on;		// the core gives it the speaker
@@ -650,19 +652,30 @@ static void rb_play_update(void)
 	}
 }
 
-// Power-up: initialized and off, so the second chip never sits in an unknown state
+// Power-up: the chip is left as the reset leaves it, its supplies and audio off; it is initialized the first time
+// dual watch gives it a channel. Initialized at power-up it made receiver A noisy with dual watch off (bench
+// 2026-10-30: noise in single receive after rb_init, none before)
+static bool rb_start(void)
+{
+	if (!rb.started) {
+		rb.started = true;
+		at1846s_attach(&rb.rf, &rfb_bus);
+		rb.chip_ok = at1846s_init(&rb.rf) && at1846s_init_finish(&rb.rf);
+	}
+	return rb.chip_ok;
+}
+
 static void rb_init(void)
 {
-	at1846s_attach(&rb.rf, &rfb_bus);
-	rb.up = at1846s_init(&rb.rf) && at1846s_init_finish(&rb.rf) && at1846s_set_mode(&rb.rf, AT1846S_MODE_FM) &&
-		at1846s_set_state(&rb.rf, AT1846S_STATE_OFF);
+	rb.up = true;		// it answers once asked (rb_start); refused tunes fall back to alternating
 	rb_supply(false, false);
 	PIN_WRITE(PIN_RXB_AUDIO, false);
 }
 
 static bool rb_tune(const rx2_tune_t *t)
 {
-	if (!rb.up || t->mode != RADIO_MODE_FM || r.mode != RADIO_MODE_FM || find_band(t->rx_hz) == NULL) {
+	if (!rb.up || t->mode != RADIO_MODE_FM || r.mode != RADIO_MODE_FM || find_band(t->rx_hz) == NULL ||
+	    !rb_start()) {
 		rb.tuned = false;	// a DMR side: the one HR_C6000 decodes one channel, so dual watch alternates
 		rb_play_update();
 		return false;
@@ -693,7 +706,7 @@ static void rb_stop(void)
 	rb.open = false;
 	rb.audio_on = false;
 	rb_play_update();
-	if (rb.up) {
+	if (rb.started && rb.chip_ok) {
 		count(at1846s_set_state(&rb.rf, AT1846S_STATE_OFF));
 	}
 	rb_supply(false, false);
