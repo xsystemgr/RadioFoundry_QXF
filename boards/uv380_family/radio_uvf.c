@@ -104,6 +104,7 @@ static struct {
 	bool play;		// its audio on the line now (audio_on and open)
 	bool uhf;
 	uint8_t close_count;
+	uint8_t poll_n;		// main status polls since receiver B was last read (RB_POLL_EVERY)
 	rx2_tune_t t;
 	uint8_t rssi, noise;
 	uint16_t flags;
@@ -720,8 +721,18 @@ static void rb_audio(bool on)
 	rb_play_update();
 }
 
+// Receiver B is read every RB_POLL_EVERY main polls (25 ms each: 100 ms), every RB_POLL_PLAYING while receiver A's
+// audio plays: fewer I2C transfers on the bus both chips share while audio is on (bench 2026-10-30: noise in dual
+// watch). Its squelch still closes after three reads in a row
+#ifndef RB_POLL_EVERY
+#define RB_POLL_EVERY		4u
+#endif
+#ifndef RB_POLL_PLAYING
+#define RB_POLL_PLAYING		8u
+#endif
+
 // From the main receiver's status poll (the radio task): receiver B's signal, and its squelch on the main one's
-// scale with the same hysteresis; closing takes three polls in a row
+// scale with the same hysteresis
 static void rb_poll(void)
 {
 	if (!rb.tuned || r.mode != RADIO_MODE_FM) {
@@ -731,9 +742,14 @@ static void rb_poll(void)
 		}
 		return;
 	}
+	if (++rb.poll_n < (audio_wanted ? RB_POLL_PLAYING : RB_POLL_EVERY)) {
+		return;
+	}
+	rb.poll_n = 0;
 	uint8_t rssi, noise;
-	uint16_t flags, value;
-	if (!at1846s_read_signal(&rb.rf, &rssi, &noise) || !at1846s_read_flags(&rb.rf, &flags)) {
+	uint16_t flags = 0, value;
+	bool tone_used = rf_tone(&rb.t.rx_tone, &value) != AT1846S_TONE_NONE;
+	if (!at1846s_read_signal(&rb.rf, &rssi, &noise) || (tone_used && !at1846s_read_flags(&rb.rf, &flags))) {
 		return;
 	}
 	rb.rssi = rssi;
