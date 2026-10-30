@@ -18,7 +18,7 @@
 // The id tools/rfoundry uses for the codec (stockfw.py MD2017_CODEC)
 #define CODEC_ID		"md2017-v405-s11"
 
-// Entry offsets from the code start: the UV380 family's codec layout (codec-mduv380.md), checked for V4.05 in an
+// Entry offsets from the code start: the UV380 family's codec layout, checked for V4.05 in an
 // emulator (hardware-md2017.md 1.1)
 #define CODEC_ENTRIES { .encode = 0x130, .decode = 0x5D8, .enc_init = 0x284, .fec_init = 0x4CC, .dec_init = 0x6D0, \
 		.enc_params = 0x848, .enc_set = 0x1C0, .dec_set = 0x688 }

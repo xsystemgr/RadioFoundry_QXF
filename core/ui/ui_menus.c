@@ -117,13 +117,21 @@ static const ui_scr_def_t hub_screen = {
 // ======================= Actions on a station or talkgroup =======================
 
 enum { A_TALK, A_PRIVATE, A_MESSAGE, A_CHECK, A_ALERT, A_POSITION, A_SAVE_CONTACT, A_SPEAK, A_SAVE_CHANNEL,
-       A_MAKE_DEFAULT };
+       A_MAKE_DEFAULT, A_LISTEN };
+
+// The talkgroup "Listen to" sets as the RX talkgroup: the group's, or the one a person was heard on (0 = none)
+static uint32_t listen_tg(void)
+{
+	return ui_target.group ? (ui_target.id != 0xFFFFFFu ? ui_target.id : 0) : ui_target.heard_tg;
+}
 
 static uint8_t act_list(uint8_t *out)
 {
 	uint8_t n = 0;
 	if (ui_target.group) {
 		out[n++] = A_TALK;
+		if (listen_tg() != 0)
+			out[n++] = A_LISTEN;
 		out[n++] = A_MAKE_DEFAULT;
 		out[n++] = A_MESSAGE;
 	} else {
@@ -131,6 +139,8 @@ static uint8_t act_list(uint8_t *out)
 						  A_SAVE_CONTACT, A_SPEAK };
 		memcpy(out, person, sizeof person);
 		n = sizeof person;
+		if (listen_tg() != 0)
+			out[n++] = A_LISTEN;	// the talkgroup they were heard on (a call "Other TG: not played")
 	}
 	if (ui_view()->temporary)
 		out[n++] = A_SAVE_CHANNEL;
@@ -225,6 +235,12 @@ static void act_item(uint16_t i, ui_item_t *it)
 		if (!(feats() & UI_FEAT_TALK_TARGET))
 			it->flags |= UI_ITEM_DIM;
 		break;
+	case A_LISTEN:	// the RX talkgroup, apart from the talk target
+		sb_str(&b, ui_view()->dmr.rx_tg == listen_tg() ? "Stop listening TG " : "Listen to TG ");
+		sb_u32(&b, listen_tg(), 1);
+		if (!(feats() & UI_FEAT_TALK_TARGET))
+			it->flags |= UI_ITEM_DIM;
+		break;
 	default:
 		break;
 	}
@@ -255,6 +271,24 @@ static void act_select(uint16_t i, bool hold)
 	case A_MAKE_DEFAULT:
 		ui_talk(&ui_target, true);
 		break;
+	case A_LISTEN: {
+		uint32_t tg = listen_tg();
+		bool off = ui_view()->dmr.rx_tg == tg;
+		if (!ui_svc_rx_tg(off ? 0 : tg)) {
+			ui_toast("RX talkgroup: not in this build");
+			break;
+		}
+		if (off) {
+			sb_str(&b, "RX TG off");
+		} else {
+			sb_str(&b, "Listening to TG ");
+			sb_u32(&b, tg, 1);
+			sb_str(&b, ui_view()->vfo ? "" : " for now");
+		}
+		ui_go_home();
+		ui_toast(msg);
+		break;
+	}
 	case A_MESSAGE:
 		if (feats() & UI_FEAT_SMS)
 			ui_push(SCR_COMPOSE, 0);

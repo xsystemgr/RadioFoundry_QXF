@@ -617,7 +617,7 @@
      "mem": "secreg",
      "start": 0,
      "end": 768,
-     "what": "security registers 1-3: kept as on the MD-UV380 until the MD-2017's use of them is read (hardware-md2017.md 4)"
+     "what": "security registers 1-3: kept as on the family's other radios until the MD-2017's use of them is read (hardware-md2017.md 4)"
     }
    ],
    "keep_codec_supported": true,

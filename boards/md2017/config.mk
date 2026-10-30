@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
-# MD-2017 feature defaults (config/features.mk lists them all): the MD-UV380's (boards/mduv380/config.mk), 720 KB in
+# MD-2017 feature defaults (config/features.mk lists them all): the UV380 family's, 720 KB in
 # sectors 3-9, the codec in sectors 10 and 11 (boards/md2017/memory.ld)
 CONFIG_DISPLAY_INSET ?= 0
 CONFIG_DISPLAY_INSET_TOP ?= 1

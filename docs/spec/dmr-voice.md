@@ -78,7 +78,8 @@ tones. In DMR it works like a DMR channel that has no codeplug record behind it:
 | Timeslot | 1 or 2, default 1. A contact's timeslot override is not applied: the VFO's slot is the slot |
 | Own ID | The radio's, as on a channel without an ID of its own |
 | Talk target | A typed ID or talkgroup, or a codeplug contact, private or group. Default: talkgroup 9, as a channel with no contact and no RX group list |
-| Heard | The talk target's group, all call, private calls to our ID, the reply window, and everything with digital monitor. The VFO has no RX group list, so no other talkgroup is played (it is shown as busy), as on a DMR channel whose list is empty |
+| Heard | The talk target's group, its RX talkgroup (below), all call, private calls to our ID, the reply window, and everything with digital monitor. The VFO has no RX group list, so no other talkgroup is played (it is shown as busy), as on a DMR channel whose list is empty |
+| RX talkgroup | One talkgroup heard besides the talk target, set apart from it (Quick "RX TG" in the VFO and on a channel, `radio_req_dmr_rx_tg`, debug link RADIO op 35). The VFO's is its own and kept with it (each VFO its own); on a channel it is for now, on top of the RX group list, until the channel changes. 0 = none |
 | Power, TOT, privacy key | The radio's, as on a channel (the VFO's power level, the radio's TOT, the radio-wide privacy key) |
 
 Not in the VFO: talker alias (a channel's setting), roaming, the "hear all by default" setting, saving to a channel.

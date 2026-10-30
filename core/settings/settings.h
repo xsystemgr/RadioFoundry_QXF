@@ -221,6 +221,10 @@ typedef struct {
 	// Zone share: the zones imported last, so the same zone sent again updates its import instead of adding a copy
 	// (docs/spec/zone-share.md 5.4); key 0 = unused, the oldest replaced first
 	settings_zs_import_t zs_import[SETTINGS_ZS_IMPORTS];
+	// The DMR VFOs' RX talkgroup, heard besides the TX one (the VFO has no RX group list; docs/spec/dmr-voice.md 2):
+	// a 24-bit talkgroup, 0 = none. An older record reads as none
+	uint32_t vfo_rx_tg;
+	uint32_t vfo2_rx_tg;
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size

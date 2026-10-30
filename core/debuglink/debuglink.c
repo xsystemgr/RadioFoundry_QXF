@@ -53,6 +53,7 @@ enum {
 	// 30: the speaker volume (DL_OP_VOLUME, debuglink_view_radio.c)
 	// 31, 32: DMR fields, Copy to VFO (DL_OP_DMR_FIELDS, DL_OP_VFO_COPY, debuglink_view_radio.c)
 	// 33, 34: the DMR voice test signal, a DTMF key down or up (DL_OP_VOICE_TEST, DL_OP_DTMF, debuglink_view_radio.c)
+	// 35: the DMR RX talkgroup (DL_OP_DMR_RX_TG, debuglink_view_radio.c)
 };
 
 static dl_parser_t parser;

@@ -5,7 +5,7 @@
 # Bring-up: receiver A alone, transmit off unless MD2017_DEFS="-DMD2017_TX=1"
 PLATFORM   := stm32f4
 MCU        := stm32f405
-# The 8 MHz reference; the image starts at sector 3, where the bootloader starts it (the MD-UV380's, hardware-mduv380.md 11)
+# The 8 MHz reference; the image starts at sector 3, where the bootloader starts it (the family's)
 HSE_VALUE  := 8000000U
 APP_BASE   := 0x0800C000
 MD2017_DEFS ?=
@@ -15,6 +15,6 @@ BOARD_DIRS := boards/md2017 boards/uv380_family platform/stm32f4/hrc platform/st
 	drivers/flash/spi_nor drivers/input/quadrature
 # The HAL's I2C driver besides the platform's modules
 BOARD_HAL_MODULES := hal_i2c
-# The 160x128 panel in 16 colors, every row visible (as the MD-UV380, unconfirmed on this radio)
+# The 160x128 panel in 16 colors, every row visible (as the family's, unconfirmed on this radio)
 MCU_DEFS   += -DGFX_INDEXED=1 -DGFX_FB_BYTES=10240u -DGFX_MAX_ROWS=128u -DUVF_LCD_HIDDEN_ROWS=0
 MCU_DEFS   += -DUVF_HSE_XTAL_FIRST=1

@@ -320,6 +320,20 @@ uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *a, uint16_t len)
 		}
 		radio_req_dtmf((char)a[0], a[1] != 0);
 		return DL_ST_OK;
+	case DL_OP_DMR_RX_TG: {
+		if (len < 4) {
+			return DL_ST_BAD_ARG;
+		}
+		uint32_t tg = (uint32_t)a[0] | ((uint32_t)a[1] << 8) | ((uint32_t)a[2] << 16) | ((uint32_t)a[3] << 24);
+		if (tg > 0xFFFFFFu) {
+			return DL_ST_BAD_ARG;
+		}
+		if (!CONFIG_DMR) {
+			return DL_ST_UNAVAILABLE;
+		}
+		radio_req_dmr_rx_tg(tg);
+		return DL_ST_OK;
+	}
 	case DL_OP_ROAM:
 		if (len < 1 || a[0] > RROAM_LOCK_TOGGLE) {
 			return DL_ST_BAD_ARG;

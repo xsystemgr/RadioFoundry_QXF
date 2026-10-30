@@ -627,10 +627,12 @@ static void vfo_use(radio_sm_t *sm, uint8_t idx)
 	sm->vfo_other.seeded = sm->vfo_seeded;
 	sm->vfo_other.talk_id = sm->vfo_talk_id;
 	sm->vfo_other.talk_private = sm->vfo_talk_private;
+	sm->vfo_other.rx_tg = sm->vfo_rx_tg;
 	sm->vfo_ch = t.ch;
 	sm->vfo_seeded = t.seeded;
 	sm->vfo_talk_id = t.talk_id;
 	sm->vfo_talk_private = t.talk_private;
+	sm->vfo_rx_tg = t.rx_tg;
 	sm->vfo_idx = idx;
 	sm->view.vfo_index = idx;
 }
@@ -923,7 +925,16 @@ static void dmr_load_channel(radio_sm_t *sm)
 			sm->talk_id = sm->vfo_talk_id;
 			sm->talk_private = sm->vfo_talk_private;
 		}
+		if (sm->vfo_rx_tg != 0) {
+			sm->listen[sm->listen_count++] = sm->vfo_rx_tg;	// its RX talkgroup besides the talk target
+		}
 		return;
+	}
+	if (sm->rx_tg_temp != 0 && sm->rx_tg_ch != sm->view.channel_number) {
+		sm->rx_tg_temp = 0;	// a channel's RX talkgroup for now lasts as long as the channel
+	}
+	if (sm->rx_tg_temp != 0) {
+		sm->listen[sm->listen_count++] = sm->rx_tg_temp;
 	}
 	uint16_t talk = codeplug_channel_talk_contact(ch);
 	if (talk != 0 && codeplug_contact(talk, &c)) {
@@ -992,6 +1003,7 @@ static void dmr_configure(radio_sm_t *sm)
 	cfg.listen.hear_all = sm->view.monitor || sm->hear_all_latch;
 	cfg.listen.groups = sm->listen;
 	cfg.listen.group_count = sm->listen_count;
+	sm->view.dmr.rx_tg = sm->view.vfo ? sm->vfo_rx_tg : sm->rx_tg_temp;
 	// The channel's TX time-out when it has one, else the radio's
 	cfg.tot_s = sm->view.tot_s;	// apply_tot: the channel's, else the radio's
 	if (sm->set.reply_s <= 30u) {
@@ -2546,7 +2558,7 @@ static bool for_selected(uint8_t type)
 {
 	switch (type) {
 	case RREQ_POWER: case RREQ_SQUELCH: case RREQ_CLEAR_TEMP: case RREQ_DMR_TARGET: case RREQ_DMR_CONTACT:
-	case RREQ_DMR_CALL_BACK: case RREQ_DMR_TARGET_CLEAR: case RREQ_DMR_HEAR_ALL:
+	case RREQ_DMR_CALL_BACK: case RREQ_DMR_TARGET_CLEAR: case RREQ_DMR_HEAR_ALL: case RREQ_DMR_RX_TG:
 		return true;
 	default:
 		return false;
@@ -4116,6 +4128,7 @@ typedef struct {
 	uint32_t talk;		// ID in bits 0-23, bit 31 private call
 	uint16_t rx_tone, tx_tone;
 	uint8_t mode, bw, power, cc, ts, rx_tone_type, tx_tone_type;
+	uint32_t rx_tg;		// the RX talkgroup, 0 = none
 } vfo_saved_t;
 
 static void vfo_saved_get(const settings_t *st, uint8_t idx, vfo_saved_t *o)
@@ -4124,7 +4137,7 @@ static void vfo_saved_get(const settings_t *st, uint8_t idx, vfo_saved_t *o)
 	if (idx != 0) {
 		*o = (vfo_saved_t){ st->vfo2_rx_hz, st->vfo2_tx_hz, st->vfo2_talk, st->vfo2_rx_tone, st->vfo2_tx_tone,
 				    st->vfo2_mode, st->vfo2_bw, st->vfo2_power, st->vfo2_cc, st->vfo2_ts,
-				    st->vfo2_rx_tone_type, st->vfo2_tx_tone_type };
+				    st->vfo2_rx_tone_type, st->vfo2_tx_tone_type, st->vfo2_rx_tg };
 		return;
 	}
 #endif
@@ -4132,7 +4145,8 @@ static void vfo_saved_get(const settings_t *st, uint8_t idx, vfo_saved_t *o)
 	*o = (vfo_saved_t){ st->vfo_rx_hz, st->vfo_tx_hz,
 			    settings_vfo_talk_id(st) | (settings_vfo_talk_private(st) ? 0x80000000u : 0),
 			    st->vfo_rx_tone, st->vfo_tx_tone, settings_vfo_mode(st), settings_vfo_bw(st), st->vfo_power,
-			    settings_vfo_cc(st), settings_vfo_ts(st), st->vfo_rx_tone_type, st->vfo_tx_tone_type };
+			    settings_vfo_cc(st), settings_vfo_ts(st), st->vfo_rx_tone_type, st->vfo_tx_tone_type,
+			    st->vfo_rx_tg };
 }
 
 static void restore_vfo(radio_sm_t *sm, const settings_t *st, uint8_t idx)
@@ -4143,6 +4157,7 @@ static void restore_vfo(radio_sm_t *sm, const settings_t *st, uint8_t idx)
 	uint32_t id = v.talk & 0xFFFFFFu;
 	sm->vfo_talk_id = id <= DMR_ID_MAX ? id : 0;
 	sm->vfo_talk_private = sm->vfo_talk_id != 0 && (v.talk & 0x80000000u) != 0;
+	sm->vfo_rx_tg = v.rx_tg <= DMR_ID_MAX ? v.rx_tg : 0;
 #endif	// a build without the DMR VFO leaves the saved target alone (persist() doesn't write it)
 	if (v.rx_hz == 0 || !board_in_band(v.rx_hz, false)) {
 		return;
@@ -4184,6 +4199,7 @@ static void persist_vfo(const radio_sm_t *sm, settings_t *st, uint8_t idx)
 		}
 #if CONFIG_VFO_DMR
 		st->vfo2_talk = sm->vfo_talk_id | (sm->vfo_talk_private ? 0x80000000u : 0);
+		st->vfo2_rx_tg = sm->vfo_rx_tg;
 #endif
 		return;
 	}
@@ -4202,6 +4218,7 @@ static void persist_vfo(const radio_sm_t *sm, settings_t *st, uint8_t idx)
 	}
 #if CONFIG_VFO_DMR
 	settings_set_vfo_talk(st, sm->vfo_talk_id, sm->vfo_talk_private);
+	st->vfo_rx_tg = sm->vfo_rx_tg;
 #endif
 }
 
@@ -4704,10 +4721,11 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 #if CONFIG_DUAL_WATCH
 	vfo_defaults(&sm->vfo_ch);	// the second VFO first, then moved to vfo_other
 	restore_vfo(sm, &st, 1);
-	sm->vfo_other = (radio_vfo_t){ sm->vfo_ch, sm->vfo_seeded, sm->vfo_talk_id, sm->vfo_talk_private };
+	sm->vfo_other = (radio_vfo_t){ sm->vfo_ch, sm->vfo_seeded, sm->vfo_talk_id, sm->vfo_talk_private, sm->vfo_rx_tg };
 	sm->vfo_seeded = false;
 	sm->vfo_talk_id = 0;
 	sm->vfo_talk_private = false;
+	sm->vfo_rx_tg = 0;
 #endif
 	vfo_defaults(&sm->vfo_ch);
 	restore_vfo(sm, &st, 0);
@@ -5152,6 +5170,26 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 	case RREQ_DMR_HEAR_ALL:
 		set_hear_all_latch(sm, req->arg != 0);
 		break;
+	case RREQ_DMR_RX_TG: {
+		uint32_t tg = (uint32_t)req->arg & DMR_ID_MAX;
+		if (sm->view.vfo) {
+			if (!CONFIG_VFO_DMR) {
+				break;
+			}
+			sm->vfo_rx_tg = tg;	// the VFO's own, saved with it (persist below)
+		} else {
+			sm->rx_tg_temp = tg;
+			sm->rx_tg_ch = sm->view.channel_number;
+		}
+		dmr_load_channel(sm);
+		if (sm->dmr_running) {
+			dmr_configure(sm);
+			sm->dmr_serial = dmr_call_view()->serial - 1u;
+		}
+		sm->view.dmr.rx_tg = tg;
+		changed(sm);
+		break;
+	}
 	case RREQ_DMR_FOCUS: {
 		uint32_t id = (uint32_t)req->arg & DMR_ID_MAX;
 		bool priv = (((uint32_t)req->arg >> 24) & 1u) != 0;

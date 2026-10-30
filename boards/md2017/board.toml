@@ -43,7 +43,7 @@ notice = "Bring-up image: back up the radio (its calibration included) with your
 mem = "secreg"
 start = 0x0
 end = 0x300
-what = "security registers 1-3: kept as on the MD-UV380 until the MD-2017's use of them is read (hardware-md2017.md 4)"
+what = "security registers 1-3: kept as on the family's other radios until the MD-2017's use of them is read (hardware-md2017.md 4)"
 
 [flash.bootloader]
 steps = [
@@ -53,7 +53,7 @@ steps = [
 	"Release the keys.",
 ]
 
-# The TYT bootloader of the MD-UV380 family, with its key (the V4.05 file is encrypted with it, hardware-md2017.md 1)
+# The TYT bootloader of the UV380 family, with its key (the V4.05 file is encrypted with it, hardware-md2017.md 1)
 [flash.dfu]
 vid = 0x0483
 pid = 0xDF11

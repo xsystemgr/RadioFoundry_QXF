@@ -54,6 +54,8 @@ typedef enum {
 	UI_TALK_DEFAULT,	// back to the channel's default (clears a temporary target)
 } ui_talk_life_t;
 bool ui_svc_talk_to(uint32_t id, bool private_call, uint8_t life);
+// An RX talkgroup heard besides the talk target (0 = none): the VFO's own, kept; on a channel for now. False without DMR
+bool ui_svc_rx_tg(uint32_t tg);
 // The target focused in a list now (0 = none): a PTT press while it is focused transmits to it once (one-shot) and
 // keeps it for the reply window. The radio reads this at PTT down; the UI calls it on every focus change
 void ui_svc_focus_target(uint32_t id, bool private_call);

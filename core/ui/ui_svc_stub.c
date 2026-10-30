@@ -23,6 +23,7 @@ WEAK uint32_t ui_svc_features(void)
 
 WEAK bool ui_svc_talk_to(uint32_t id, bool private_call, uint8_t life) { (void)id; (void)private_call; (void)life; return false; }
 WEAK void ui_svc_focus_target(uint32_t id, bool private_call) { (void)id; (void)private_call; }
+WEAK bool ui_svc_rx_tg(uint32_t tg) { (void)tg; return false; }
 
 WEAK bool ui_svc_dmr_timeslot(uint8_t ts) { (void)ts; return false; }
 WEAK bool ui_svc_dmr_color_code(uint8_t cc) { (void)cc; return false; }

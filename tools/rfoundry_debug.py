@@ -166,6 +166,7 @@ OP_DMR_FIELDS = 31
 OP_VFO_COPY = 32
 OP_VOICE_TEST = 33
 OP_DTMF = 34
+OP_DMR_RX_TG = 35
 DTMF_DIGITS = "0123456789*#ABCD"
 VOLUME_KNOB = 0xFF
 OP_PPP = 28
@@ -740,6 +741,10 @@ class DebugLink:
     def dmr_call_back(self):
         self.radio(OP_DMR_CALL_BACK)
 
+    def dmr_rx_tg(self, tg):
+        """An RX talkgroup heard besides the talk target, 0 = none: the VFO's own (kept), on a channel for now."""
+        self.radio(OP_DMR_RX_TG, struct.pack("<I", int(tg) & 0xFFFFFF))
+
     def dmr_target_clear(self):
         self.radio(OP_DMR_TARGET_CLEAR)
 
@@ -1196,6 +1201,8 @@ def cmd_radio(link, a):
         link.dmr_call_back()
     elif op == "target-clear":
         link.dmr_target_clear()
+    elif op == "rx-tg":               # rx-tg TG (0 = none): heard besides the talk target
+        link.dmr_rx_tg(num(0))
     elif op == "privacy":             # privacy off | moto KEY | anytone KEY
         link.dmr_privacy(args[0], int(args[1], 0) if len(args) > 1 else 0)
     elif op == "scan":                # scan stop|zone|vfo|dual POS|cancel|nuisance|toggle|select a|b
@@ -1754,7 +1761,7 @@ def main(argv=None):
     p.add_argument("op", choices=["channel", "pos", "zone", "vfo", "freq", "step", "power", "squelch", "bw", "tone",
                                   "monitor", "clear", "reply-cancel", "hotspot-exit", "target", "contact", "call-back",
                                   "target-clear", "privacy", "scan", "scan-vfo", "beep", "burst", "set", "usb",
-                                  "usb-settings", "ppp", "vibrate", "mode", "cc", "ts", "copy-vfo", "voice-test", "dtmf"])
+                                  "usb-settings", "ppp", "vibrate", "mode", "cc", "ts", "copy-vfo", "voice-test", "dtmf", "rx-tg"])
     p.add_argument("args", nargs="*")
     p = sub.add_parser("data", help="DMR data: sms, call alert, radio check, settings, inbox")
     p.add_argument("op", choices=["sms", "alert", "check", "settings", "inbox", "read", "emergency", "em-settings",

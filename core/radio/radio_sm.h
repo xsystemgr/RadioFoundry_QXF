@@ -141,6 +141,8 @@ typedef enum {
 	RREQ_VFO_COPY,		// the channel's settings into the VFO, and open it (CONFIG_VFO); no-op in the VFO
 	RREQ_DTMF,		// arg: the digit (ASCII) in bits 7:0, bit 8 = key down (0 = up)
 	RREQ_DUAL,		// dual watch (CONFIG_DUAL_WATCH): arg channel A, arg2 channel B, radio_dual_arg()
+	RREQ_DMR_RX_TG,		// DMR: arg = an RX talkgroup heard besides the TX one, 0 = none (the VFO's own; on a channel
+				// for now, added to its RX group list)
 } radio_req_type_t;
 
 // RREQ_TONE's argument: which (RADIO_TONE_*) in bits 25:24, the tone type in 23:16, the value in 15:0
@@ -184,6 +186,7 @@ typedef struct {
 	bool seeded;
 	uint32_t talk_id;
 	bool talk_private;
+	uint32_t rx_tg;
 } radio_vfo_t;
 #endif
 
@@ -210,6 +213,9 @@ typedef struct {
 	bool vfo_seeded;		// vfo_ch holds a frequency
 	uint32_t vfo_step_set;		// the VFO's step as set, 0 = auto: from the width (view.vfo_step_hz has the one in use)
 	uint32_t vfo_talk_id;		// the DMR VFO's talk target (CONFIG_VFO_DMR), 0 = none chosen: talkgroup 9
+	uint32_t vfo_rx_tg;		// the DMR VFO's RX talkgroup besides the talk target, 0 = none (RREQ_DMR_RX_TG)
+	uint32_t rx_tg_temp;		// a channel's RX talkgroup for now (RREQ_DMR_RX_TG on a channel), 0 = none
+	uint16_t rx_tg_ch;		// ... on this channel number
 	bool vfo_talk_private;
 	uint8_t vfo_idx;		// which VFO the four above are: 0 or 1 (view.vfo_index)
 #if CONFIG_DUAL_WATCH

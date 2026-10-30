@@ -106,6 +106,15 @@ void ui_svc_focus_target(uint32_t id, bool private_call)
 	radio_req_dmr_focus(id, private_call);
 }
 
+bool ui_svc_rx_tg(uint32_t tg)
+{
+	if (tg > 0xFFFFFFu) {
+		return false;
+	}
+	radio_req_dmr_rx_tg(tg);
+	return true;
+}
+
 bool ui_svc_dmr_timeslot(uint8_t ts)
 {
 	if (ts != 1 && ts != 2) {

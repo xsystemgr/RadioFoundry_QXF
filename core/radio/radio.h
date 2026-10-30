@@ -154,6 +154,7 @@ typedef struct {
 	bool alias_tx;		// our talker alias goes out on this channel
 	bool hear_all;		// every talkgroup on our slot: MONITOR held, or the hear all latch
 	bool hear_all_latch;	// hear all latched (radio_req_dmr_hear_all), until the channel changes
+	uint32_t rx_tg;		// the RX talkgroup set with radio_req_dmr_rx_tg (VFO, or a channel for now), 0 = none
 	uint32_t focus_id;	// the focused row's target (radio_req_dmr_focus), 0 = none: PTT talks to it once
 	// The channel's SFR role (CONFIG_SFR, docs/spec/sfr.md 4): sfrRole_t, 0 none. A repeater role runs instead of the
 	// call stack (active false): sfr_rpt, with its outbound slot keyed (sfr_keyed) and an inbound call (sfr_busy)
@@ -390,6 +391,9 @@ void radio_req_dmr_color_code(uint8_t cc);	// 0..15
 void radio_req_mode(uint8_t mode);		// radio_mode_t: FM or DMR on the current channel or the VFO
 // Hear all latched on (every talkgroup on our slot, as while MONITOR is held) until off or the channel changes
 void radio_req_dmr_hear_all(bool on);
+// An RX talkgroup heard besides the talk target (0 = none): the VFO's own, kept with it; on a channel for now (until
+// the channel changes), on top of its RX group list
+void radio_req_dmr_rx_tg(uint32_t tg);
 // The talk target focused in a list (the UI calls it on every focus change; id 0 = none). A PTT press while one is
 // focused transmits to it once (one-shot) and keeps it as the talk target for the reply window, then the channel's
 // (or the chosen) target is back. BACK on Home (radio_req_reply_cancel) ends it at once

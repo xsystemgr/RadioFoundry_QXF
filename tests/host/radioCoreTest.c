@@ -1254,6 +1254,16 @@ static void test_vfo_dmr(void)
 	const radio_dmr_view_t *d = &sm.view.dmr;
 
 	dmr_start(true);			// channel 4: DMR, CC 2, TS 1, TG 201
+	// On a channel an RX talkgroup is for now, on top of the RX group list
+	hear_call(true, 3300, 3107777, 2, 1, false);
+	CHECK(d->state == RDMR_RX_OTHER);
+	run(500);
+	req(RREQ_DMR_RX_TG, 3300);
+	run(20);
+	CHECK(d->rx_tg == 3300 && sm.rx_tg_temp == 3300 && sm.vfo_rx_tg == 0);
+	hear_call(true, 3300, 3107777, 2, 1, false);
+	CHECK(d->state == RDMR_RX && d->call.dst == 3300);
+	run(500);
 	req(RREQ_VFO_SET, 446000000);
 	CHECK(sm.view.vfo && sm.view.ch.mode == RADIO_MODE_FM && !sim.started && hw_mode == RADIO_MODE_FM);
 	// FM -> DMR on the same frequency: the call stack starts, the board's mode follows, no temporary dot
@@ -1268,6 +1278,29 @@ static void test_vfo_dmr(void)
 	CHECK(d->last_ms != 0 && d->last.dst == 9 && d->last.src == 3105555);
 	hear_call(true, 3100, 3107777, 1, 1, false);
 	CHECK(d->state == RDMR_RX_OTHER);
+	run(500);
+	// An RX talkgroup apart from the talk target: heard, the talk target stays; kept in the VFO's settings
+	req(RREQ_DMR_RX_TG, 3100);
+	run(20);
+	CHECK(d->rx_tg == 3100 && sm.vfo_rx_tg == 3100 && d->target_id == 9);
+	hear_call(true, 3100, 3107777, 1, 1, false);
+	CHECK(d->state == RDMR_RX && d->call.dst == 3100);
+	run(500);
+	{
+		settings_t *rs = settings_begin();
+		CHECK(rs->vfo_rx_tg == 3100 || rs->vfo2_rx_tg == 3100);
+		settings_end(now);
+	}
+	CHECK(debuglink_radio_feature_op(DL_OP_DMR_RX_TG, (const uint8_t[]){ 0, 0, 0, 0 }, 4) == DL_ST_OK);
+	run(20);
+	CHECK(d->rx_tg == 0 && sm.vfo_rx_tg == 0);
+	CHECK(debuglink_radio_feature_op(DL_OP_DMR_RX_TG, (const uint8_t[]){ 0, 0, 0, 1 }, 4) == DL_ST_BAD_ARG);
+	CHECK(debuglink_radio_feature_op(DL_OP_DMR_RX_TG, (const uint8_t[]){ 0, 0 }, 2) == DL_ST_BAD_ARG);
+	CHECK(debuglink_is_feature_op(DL_OP_DMR_RX_TG));
+	req(RREQ_REPLY_CANCEL, 0);	// the call opened the reply window to TG 3100, which hears it too
+	run(20);
+	hear_call(true, 3100, 3107777, 1, 1, false);
+	CHECK(d->state == RDMR_RX_OTHER);	// off again: not heard
 	run(500);
 	hear_call(true, 9, 3105555, 5, 1, false);	// another color code: not heard
 	CHECK(sm.view.state == RS_IDLE);
@@ -2586,6 +2619,7 @@ radio_vfo_copy_t radio_req_vfo_copy_checked(void)
 	return r;
 }
 void radio_req_dmr_hear_all(bool on) { req(RREQ_DMR_HEAR_ALL, on); }
+void radio_req_dmr_rx_tg(uint32_t tg) { req(RREQ_DMR_RX_TG, (int32_t)tg); }
 static int focus_posts;
 void radio_req_dmr_focus(uint32_t id, bool p)
 {
@@ -4112,7 +4146,7 @@ static void test_factory_reset(void)
 	CHECK(settings_flush());
 	n_ev = 0;
 	CHECK(ui_svc_factory_reset());
-	sim_flash_cut_after(432);	// the settings records (page 1: 172 + 4 bytes, page 0: 252 + 4) go in, the native erase fails
+	sim_flash_cut_after(440);	// the settings records (page 1: 180 + 4 bytes, page 0: 252 + 4) go in, the native erase fails
 	storage_job_poll();
 	sim_flash_power_on();
 	CHECK(n_ev == 1 && strstr(last_ev.text, "native") != NULL);

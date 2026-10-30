@@ -1243,6 +1243,13 @@ static void draw_chips_dmr(const radio_view_t *v, const ui_state_t *s)
 	x = gfx_text(f, x, L->chips_y, ui_power_name(v->power), pw_temp ? ui_col.warn : ui_col.fg) + f->w;
 	if ((v->dmr.hear_all || s->hear_all) && x + 4 * f->w <= gfx_width())
 		x = gfx_text(f, x, L->chips_y, "DMon", ui_col.warn) + f->w;	// digital monitor (FM's is "Mon")
+	if (v->dmr.rx_tg != 0) {	// the RX talkgroup besides the talk target: "RX2020"
+		sb_init(&b, buf, sizeof buf);
+		sb_str(&b, "RX");
+		sb_u32(&b, v->dmr.rx_tg, 1);
+		if (x + (int)strlen(buf) * f->w <= gfx_width())
+			x = gfx_text(f, x, L->chips_y, buf, ui_col.fg) + f->w;
+	}
 	if ((s->privacy || v->dmr.privacy) && x + 4 * f->w <= gfx_width())
 		gfx_text(f, x, L->chips_y, "Priv", ui_col.priv);
 }

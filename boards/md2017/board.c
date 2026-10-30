@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
 // TYT MD-2017 / Retevis RT82: board descriptor, key map and what sets the radio apart in the UV380 family
-// (boards/uv380_family/uvf.h with UVF_MD2017, docs/spec/hardware-md2017.md). Bring-up: receiver A only, the MD-UV380's
+// (boards/uv380_family/uvf.h with UVF_MD2017, docs/spec/hardware-md2017.md). Bring-up: receiver A only, the UV380 family's
 // keypad, calibration and power tables until each is checked on the radio, and no transmit unless built with
 // MD2017_DEFS="-DMD2017_TX=1"
 #include "board.h"
@@ -24,7 +24,7 @@
 #define MD2017_TX		0
 #endif
 
-// The MD-UV380's matrix (hardware-mduv380.md 5), unconfirmed here: the keys pressed show on the diagnostics page
+// The UV380 family's other radios' matrix, unconfirmed here: the keys pressed show on the diagnostics page
 const uint8_t uvf_key_matrix[3][8] = {
 	{ KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_0, KEY_STAR },
 	{ KEY_GREEN, KEY_UP, KEY_DOWN, KEY_7, KEY_8, KEY_9, KEY_HASH, KEY_RED },
@@ -77,7 +77,7 @@ static bool diag_line(uint8_t i, char *buf, uint8_t len)
 }
 #endif
 
-// The MD-UV380 5 W rows (hardware-mduv380.md 6, 7, 8): placeholders until the MD-2017's are measured
+// The UV380 family's 5 W rows: placeholders until the MD-2017's are measured
 const uvf_variant_t uvf_variant = {
 	.panel_type = { 0, 1, 2, 3 },
 	.panel_rgb = { true, true, true, true },
@@ -100,7 +100,7 @@ static const band_t bands[] = {
 static const char *const power_names[] = { "50mW", "250mW", "500mW", "750mW", "1W", "2W", "3W", "4W", "5W" };
 
 // docs/ux/information-architecture.md 7.1 on a radio without function or top keys (a few-key map): the zone and power
-// are reached from the menus. SK1 and SK2 as on the MD-UV380 until the MD-2017's matrix is
+// are reached from the menus. SK1 and SK2 as on the family's other radios until the MD-2017's matrix is
 // read on the bench (hardware-md2017.md 3.1)
 static const keymap_entry_t keymap[] = {
 	{ KEY_GREEN, ACT_SELECT, ACT_SELECT, false, false, 0 },
@@ -129,7 +129,7 @@ static const uint8_t side_keys[] = { KEY_SK1, KEY_SK2 };
 static const char *const side_key_names[] = { "SK1", "SK2" };
 
 #if CONFIG_CPS_OPENFW
-// open-firmware-cps.md 4: type 6, the MD-UV380 family (the MD-2017 has no type of its own yet, ?)
+// open-firmware-cps.md 4: type 6, the UV380 family (the MD-2017 has no type of its own yet, ?)
 static uint32_t cps_radio_type(void)
 {
 	return 6;
@@ -185,7 +185,7 @@ const board_t board = {
 #if CONFIG_GPS
 	.gps_present = stm32_gps_present,
 #endif
-	// The family's thresholds (hardware-mduv380.md 6), unconfirmed on this radio: low battery 6.2 V, critical 6.0 V
+	// The family's thresholds, unconfirmed on this radio: low battery 6.2 V, critical 6.0 V
 	.battery_low_mv = 6200,
 	.battery_critical_mv = 6000,
 #if CONFIG_CPS_OPENFW
