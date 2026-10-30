@@ -75,8 +75,9 @@
 #endif
 #define AT1846S_I2C_ADDR	0x2E
 // Bits ORed into the AT1846S reg 0x30 in RX: the MD-2017's TYT image sets bit 7 whenever it opens a receiver's
-// audio, analog or digital (hardware-md2017.md 2.3); the MD-UV390's doesn't. MD2017_RX_BIT7=0 builds without it
-#if UVF_MD2017 && (!defined(MD2017_RX_BIT7) || MD2017_RX_BIT7)
+// audio, analog or digital (hardware-md2017.md 2.3); the MD-UV390's doesn't. Tried on the radio: with it the HR_C6000
+// saw no DMR sync at all (2026-10-30), so it is off; MD2017_RX_BIT7=1 builds it in for tests
+#if UVF_MD2017 && defined(MD2017_RX_BIT7) && MD2017_RX_BIT7
 #define UVF_AT1846S_RX_EXTRA	0x0080u
 #else
 #define UVF_AT1846S_RX_EXTRA	0x0000u
