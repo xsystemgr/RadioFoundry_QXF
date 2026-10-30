@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 The RadioFoundry Authors
+# The MD-2017's registry entry (tools/boards.py, docs/dev/adding-a-radio.md). Build facts stay in board.mk and
+# config.mk, the memory layout in boards/md2017/memory.ld.
+
+id = "md2017"
+name = "TYT MD-2017"
+maker = "TYT"
+model = "MD-2017"
+also = ["Retevis RT82"]
+kind = "handheld"
+order = 7
+
+[docs]
+hardware = "docs/spec/hardware-md2017.md"
+codec = "docs/spec/hardware-md2017.md"
+install = "docs/user/02-installing.md"
+bringup = "docs/testing/md2017-bringup.md"
+
+[hardware]
+bands = "136-174 / 400-480 MHz"
+power = "1 / 2 / 5 W"
+display = "1.77\" color, 160 × 128"
+gallery = "160x128"
+clock = { rtc = "unknown", note = "STM32 RTC, as on the UV380 family; not checked on this radio (docs/spec/hardware-md2017.md)" }
+
+[status]
+level = "bring-up"
+summary = """\
+The UV380 family code with the MD-2017's pins (two AT1846S on their own bus, the HR_C6000 control bus, backlight, \
+receiver switches) and its codec from TYT V4.05; receiver A only and transmit off. Nothing has run on a radio yet."""
+release = "testing"
+
+[flash]
+family = "usb-dfu"
+keep_codec = true
+stock_download = "https://www.tyt888.com/"
+stock_versions = ["V4.05 UVCSV"]
+backup = { stock = "none", rfoundry = "full", spi_size = 0x1000000 }
+notice = "Bring-up image: back up the radio (its calibration included) with your current firmware's CPS before installing. Transmit is off in this image."
+
+[[flash.protect]]
+mem = "secreg"
+start = 0x0
+end = 0x300
+what = "security registers 1-3: kept as on the MD-UV380 until the MD-2017's use of them is read (hardware-md2017.md 4)"
+
+[flash.bootloader]
+steps = [
+	"Turn the radio off and connect the programming cable.",
+	"Hold PTT and the side key just above it.",
+	"Turn the radio on with the volume knob while you hold both keys. The screen stays dark.",
+	"Release the keys.",
+]
+
+# The TYT bootloader of the MD-UV380 family, with its key (the V4.05 file is encrypted with it, hardware-md2017.md 1)
+[flash.dfu]
+vid = 0x0483
+pid = 0xDF11
+string1 = "AnyRoad Technology"
+product = "Digital Radio in USB mode"
+key_sha256 = "739ce35cc8db6e72f95598effac1a01ae71dbe2a5792c1a69acaee5dbf634991"
+key_prefix = "00AA8989"
+
+[flash.stub]
+id = 6
+tested = false
+spi = { bus = 1, mode = 0, hz = 4500000 }
+
+# The codec where the merge puts it: tables at their stock address, the code after them and the descriptor, all in
+# sectors 10 and 11 (tools/rfoundry/rfoundry/stockfw.py PROFILES)
+[codec]
+tool = "codec_extract"
+stock = [
+	"51944821b12066654101d3c9889472fd111525c2ed114ebeeb67bf1ff1bfc871",	# V4.05 UVCSV
+]
+
+[frame]
+shape = "handheld"
+body = "#1b1c1f"
+accent = "#3a7bd5"
+lens = [30, 30]
+
+[cps]
+radio_types = [6]

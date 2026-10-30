@@ -35,6 +35,8 @@ typedef struct {
 	// Why the transmitter must stay off on this radio, or NULL to allow it (asked on every tx()): a build for the
 	// wrong hardware version
 	const char *(*tx_block)(void);
+	// Board diagnostics lines after the family's (uvf_diag_line), or NULL: i counts from 0
+	bool (*diag_line)(uint8_t i, char *buf, uint8_t len);
 } uvf_variant_t;
 extern const uvf_variant_t uvf_variant;
 // The key matrix, [row PA6, PD2, PD3][column D0..D7], with the key bits below (input_uvf.c)

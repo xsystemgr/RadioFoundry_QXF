@@ -100,14 +100,14 @@ static void count(bool ok)
 	}
 }
 
-// --- AT1846S bus: I2C3 (hardware-dm1701.md 5.1) ---
+// --- AT1846S bus: I2C3 (hardware-dm1701.md 5.1); I2C1 on PB6 / PB7 on the MD-2017 (pins.h UVF_RF_I2C) ---
 
 static void i2c_setup(void)
 {
-	__HAL_RCC_I2C3_CLK_ENABLE();
-	stm32_pin_af(PIN_PORT(PIN_I2C3_SCL), PIN_MASK(PIN_I2C3_SCL), GPIO_AF4_I2C3, true, GPIO_PULLUP);
-	stm32_pin_af(PIN_PORT(PIN_I2C3_SDA), PIN_MASK(PIN_I2C3_SDA), GPIO_AF4_I2C3, true, GPIO_PULLUP);
-	i2c3.Instance = I2C3;
+	UVF_RF_I2C_CLK_ENABLE();
+	stm32_pin_af(PIN_PORT(PIN_RF_SCL), PIN_MASK(PIN_RF_SCL), UVF_RF_I2C_AF, true, GPIO_PULLUP);
+	stm32_pin_af(PIN_PORT(PIN_RF_SDA), PIN_MASK(PIN_RF_SDA), UVF_RF_I2C_AF, true, GPIO_PULLUP);
+	i2c3.Instance = UVF_RF_I2C;
 	i2c3.Init.ClockSpeed = 400000;
 	i2c3.Init.DutyCycle = I2C_DUTYCYCLE_2;
 	i2c3.Init.OwnAddress1 = 0;
@@ -184,12 +184,12 @@ static bool rf_read(void *ctx, uint8_t reg, uint16_t *val)
 
 static const at1846s_bus_t rf_bus = { .write = rf_write, .read = rf_read, .delay_ms = hal_delay_ms, .ctx = NULL };
 
-// --- HR_C6000 bus: bit-banged config SPI on PE2-PE5 (hardware-dm1701.md 4.2) ---
+// --- HR_C6000 bus: bit-banged config SPI on PE2-PE5 (hardware-dm1701.md 4.2); the MD-2017's clock is PC13 ---
 
 // The configuration port on PE2-PE5 and the voice port on SPI2 (PB13-PB15, AF5, chip select PIN_C6000_VCS): mode 2,
 // PCLK1 / 8 = 4.5 MHz. The shared transfers (platform/stm32f4/hrc/hrc_bus.c) mask the modem interrupts around each
 static const stm32_hrc_bus_cfg_t modem_cfg = {
-	.port = GPIOE,
+	.port = PIN_PORT(PIN_C6000_CS), .clk_port = PIN_PORT(PIN_C6000_CLK),
 	.cs = PIN_MASK(PIN_C6000_CS), .clk = PIN_MASK(PIN_C6000_CLK), .mosi = PIN_MASK(PIN_C6000_MOSI),
 	.miso = PIN_MASK(PIN_C6000_MISO),
 	.voice_spi = SPI2, .voice_br = 2,
@@ -586,7 +586,9 @@ static void init(void)
 	if (speaker_lock == NULL) {
 		speaker_lock = xSemaphoreCreateMutex();
 	}
+#ifdef PIN_MIC_POWER
 	PIN_WRITE(PIN_MIC_POWER, true);		// kept on in RX and TX (4.5: some speaker-mics see false PTT without bias)
+#endif
 	rx_supply(false, false);
 	dac_setup();
 	pa_off();

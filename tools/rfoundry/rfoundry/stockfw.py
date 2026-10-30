@@ -47,6 +47,7 @@ MD9600_KEY_SHA256 = "c3d665b297651b52310ec098e87440b147136241359c1154d474e517b04
 DM1701_CODEC = "dm1701-v0206-csv-s11"
 MDUV380_CODEC = "mduv380-1926-s11"
 MD380_CODEC = "md380-d2032-s11"
+MD2017_CODEC = "md2017-v405-s11"
 # The count word of the single-segment container form (the MD-380 D002.032 file: one segment, count 0xFFFFFFFF)
 SINGLE_SEGMENT = 0xFFFFFFFF
 
@@ -1411,6 +1412,25 @@ PROFILES = {
         "placed": {"code": (0x54F942E7, "c95719b5fb2d403ea0c31d3fa70cb27482b4829cdfd5d5df5c945336b54824cf"),
                    "tables": (0x55648D6B, "2a388c51ec726f26514152efab7d3d5a572c5842be625f1f16f4ddfd55ecd635"),
                    "extra": [0x7AAFE1D3, 0x33E82E70, 0xFFF0E930, 0xDA18C5EF]},
+    },
+    # TYT MD-2017 V4.05 (hardware-md2017.md 1.1): the MD-UV380 key and container; the codec has the 18.xx shape but its
+    # own code (map md2017/md2017-v405). Its window also carries application code the codec never runs, whose three
+    # table words the map doesn't list (they stay valid: the tables don't move). The tables stay at their stock address,
+    # cut to the codec's data (to the end of its last object, 0x080E4A4A); the code goes right after them, word aligned,
+    # 0xBE52 bytes below the descriptor. Checked moved in an emulator: bit-identical to the stock-placed codec
+    "51944821b12066654101d3c9889472fd111525c2ed114ebeeb67bf1ff1bfc871": {
+        "name": "TYT2017-UVCSV-V4.05.bin",
+        "version": "V4.05 UVCSV",
+        "board": "md2017",
+        "key_sha256": MDUV380_KEY_SHA256,
+        "codec_profile": MD2017_CODEC,
+        "size": 1276416,
+        "segments": [(0x00060000, 0x5D400), (0x0800C000, 0xDA400)],
+        "code": (0x08075808, 0xF6E2, "dda72c91f42456deac38f596fdfdf5f04c01cac071e177b750f4d7006cbeec49"),
+        "tables": (0x080D2AF4, 0x11F56, "87d676a7e1b36774a18511dcb10c46c633c88baa206531c2560f3c4f2e013ca4"),
+        "placement": {"code": 0x080E4A4C, "tables_len": 0x11F56, "tag": 0x00550405},
+        "placed": {"code": (0xA0E05F0C, "1565152fdbbb46bd1f0bafdb5bd3d80c00b2ab440bf2a5bae28d3b48bd771705"),
+                   "tables": (0x08F19F1D, "6ab2afe8118a7ba021acc59ae582bd696185608d7c7788ba7f44cfcec7957e3b")},
     },
 }
 

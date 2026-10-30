@@ -172,7 +172,7 @@ bool uvf_diag_line(uint8_t i, char *buf, uint8_t len)
 		break;
 	}
 	default:
-		return false;
+		return uvf_variant.diag_line != NULL && uvf_variant.diag_line((uint8_t)(i - 13u), buf, len);
 	}
 	*o.p = '\0';
 	return true;

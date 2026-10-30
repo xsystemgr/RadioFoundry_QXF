@@ -81,8 +81,17 @@ static void reset_levels(void)
 	stm32_pin_out(PIN_PORT(PIN_KEY_ROW0), PIN_MASK(PIN_KEY_ROW0), false, false);
 	stm32_pin_out(PIN_PORT(PIN_KEY_ROW1), PIN_MASK(PIN_KEY_ROW1), false, false);
 	stm32_pin_out(PIN_PORT(PIN_KEY_ROW2), PIN_MASK(PIN_KEY_ROW2), false, false);
+#ifdef PIN_MIC_POWER
 	stm32_pin_out(PIN_PORT(PIN_MIC_POWER), PIN_MASK(PIN_MIC_POWER), false, false);
+#endif
+#ifdef PIN_GPS_POWER
 	stm32_pin_out(PIN_PORT(PIN_GPS_POWER), PIN_MASK(PIN_GPS_POWER), false, false);
+#endif
+#if UVF_MD2017	// receiver B: supplies and audio off (hardware-md2017.md 2.2, 2.3)
+	stm32_pin_out(PIN_PORT(PIN_RXB_UHF_5V), PIN_MASK(PIN_RXB_UHF_5V), false, false);
+	stm32_pin_out(PIN_PORT(PIN_RXB_VHF_5V), PIN_MASK(PIN_RXB_VHF_5V), false, false);
+	stm32_pin_out(PIN_PORT(PIN_RXB_AUDIO), PIN_MASK(PIN_RXB_AUDIO), false, false);
+#endif
 
 	stm32_pin_out(PIN_PORT(PIN_PA_EN1), PIN_MASK(PIN_PA_EN1), false, false);
 	stm32_pin_out(PIN_PORT(PIN_PA_EN2), PIN_MASK(PIN_PA_EN2), false, false);

@@ -536,6 +536,147 @@
    "build_options": [],
    "cps_radio_types": []
   },
+  "md2017": {
+   "id": "md2017",
+   "name": "TYT MD-2017",
+   "model": "MD-2017",
+   "part_of": null,
+   "platform": "stm32f4",
+   "platform_stubs": [
+    "stub/stm32f4"
+   ],
+   "family": "usb-dfu",
+   "link": "usb",
+   "release": "testing",
+   "debuglink_names": [
+    "MD-2017",
+    "md2017"
+   ],
+   "rom_base": 134217728,
+   "app_base": 134266880,
+   "flash_end": 135266304,
+   "app_region": [
+    134266880,
+    135004160
+   ],
+   "sectors": [
+    [
+     3,
+     134266880,
+     16384
+    ],
+    [
+     4,
+     134283264,
+     65536
+    ],
+    [
+     5,
+     134348800,
+     131072
+    ],
+    [
+     6,
+     134479872,
+     131072
+    ],
+    [
+     7,
+     134610944,
+     131072
+    ],
+    [
+     8,
+     134742016,
+     131072
+    ],
+    [
+     9,
+     134873088,
+     131072
+    ],
+    [
+     10,
+     135004160,
+     131072
+    ],
+    [
+     11,
+     135135232,
+     131072
+    ]
+   ],
+   "protected": [
+    [
+     134217728,
+     134266880
+    ]
+   ],
+   "protect": [
+    {
+     "mem": "secreg",
+     "start": 0,
+     "end": 768,
+     "what": "security registers 1-3: kept as on the MD-UV380 until the MD-2017's use of them is read (hardware-md2017.md 4)"
+    }
+   ],
+   "keep_codec_supported": true,
+   "first_stage": null,
+   "codec_tool": "codec_extract",
+   "codec_stock": [
+    "51944821b12066654101d3c9889472fd111525c2ed114ebeeb67bf1ff1bfc871"
+   ],
+   "codec": {
+    "id": null,
+    "windows": null,
+    "installed": [],
+    "sources": null
+   },
+   "codec_code": null,
+   "codec_slot": null,
+   "codec_run": null,
+   "codec_tables": null,
+   "loader_id": null,
+   "loader_keys": null,
+   "loader_sign": "",
+   "bootloader_steps": [
+    "Turn the radio off and connect the programming cable.",
+    "Hold PTT and the side key just above it.",
+    "Turn the radio on with the volume knob while you hold both keys. The screen stays dark.",
+    "Release the keys."
+   ],
+   "stock_download": "https://www.tyt888.com/",
+   "key_sha256": "739ce35cc8db6e72f95598effac1a01ae71dbe2a5792c1a69acaee5dbf634991",
+   "key_prefix": "00AA8989",
+   "dfu_ids": [
+    1155,
+    57105
+   ],
+   "dfu_string1": "AnyRoad Technology",
+   "dfu_product": "Digital Radio in USB mode",
+   "stub": {
+    "tool": "f4stub",
+    "id": 6,
+    "tested": false,
+    "hse": 8000000,
+    "boot_end": 134266880,
+    "spi": {
+     "bus": 1,
+     "mode": 0,
+     "hz": 4500000,
+     "af": 5,
+     "sck": "PB3",
+     "miso": "PB4",
+     "mosi": "PB5",
+     "cs": "PD7",
+     "idle": []
+    }
+   },
+   "build_options": [],
+   "cps_radio_types": [
+    6
+   ]
+  },
   "md380": {
    "id": "md380",
    "name": "TYT MD-380",

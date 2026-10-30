@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
 // UV380 family pin map (docs/spec/hardware-dm1701.md section 2), the same on every radio of the family but the MD-UV390
-// Plus 10 W, which swaps PC6 and PD8 (hardware-mduv380.md 3: the mduv380 board's POWER=10w build). Each board's own
-// pins.h includes this one
+// Plus 10 W, which swaps PC6 and PD8 (hardware-mduv380.md 3: the mduv380 board's POWER=10w build), and the MD-2017
+// (UVF_MD2017, boards/md2017: two AT1846S on PB6 / PB7, its own RX supplies, receiver audio switches, C6000 control
+// bus and backlight; hardware-md2017.md 2, 3). Each board's own pins.h includes this one
 #ifndef UVF_PINS_H
 #define UVF_PINS_H
 
 #include "platform.h"
+
+#ifndef UVF_MD2017
+#define UVF_MD2017		0	// 1: the MD-2017's pins (boards/md2017/board.mk)
+#endif
 
 // Analog
 #define PIN_VOLUME		GPIOA, GPIO_PIN_0	// ADC1_IN0
@@ -15,8 +20,17 @@
 #define PIN_APC_DAC		GPIOA, GPIO_PIN_4	// DAC_OUT1, PA power reference
 
 // RF path
+#if UVF_MD2017
+// Receiver A (the AT1846S at 0x2E, the transceiver) and receiver B (0x71, receive only) each have their own UHF and
+// VHF supplies (hardware-md2017.md 2.2); this firmware runs receiver A alone and keeps B's supplies off
+#define PIN_RX_UHF_5V		GPIOC, GPIO_PIN_9
+#define PIN_RX_VHF_5V		GPIOA, GPIO_PIN_5
+#define PIN_RXB_UHF_5V		GPIOA, GPIO_PIN_8
+#define PIN_RXB_VHF_5V		GPIOA, GPIO_PIN_2
+#else
 #define PIN_RX_UHF_5V		GPIOA, GPIO_PIN_2
 #define PIN_RX_VHF_5V		GPIOA, GPIO_PIN_5
+#endif
 #define PIN_PA_EN1		GPIOC, GPIO_PIN_5	// TX supply
 #define PIN_PA_EN2		GPIOC, GPIO_PIN_4	// APC loop enable
 #if defined(RFOUNDRY_POWER_10W) && RFOUNDRY_POWER_10W
@@ -27,27 +41,51 @@
 
 // Power, audio, LEDs
 #define PIN_POWER_LATCH		GPIOA, GPIO_PIN_7
+#if !UVF_MD2017	// the MD-2017 reads PA13 as an input and never drives PA9 / PA10 (hardware-md2017.md 3): not driven
 #define PIN_MIC_POWER		GPIOA, GPIO_PIN_13	// SWDIO: driving it needs connect-under-reset for SWD
 #define PIN_GPS_POWER		GPIOA, GPIO_PIN_9	// high = on (hardware-mduv380.md 9, hardware-dm1701.md 14.2)
 #define PIN_GPS_RX		GPIOA, GPIO_PIN_10	// USART1 RX (AF7), the module's NMEA output
+#endif
 #define PIN_SPK_MUTE		GPIOB, GPIO_PIN_8	// high = muted
 #define PIN_AMP_EN		GPIOB, GPIO_PIN_9	// high = on
-#define PIN_RX_AUDIO_MUX	GPIOD, GPIO_PIN_9	// high = HR_C6000 line out to the amp
+#define PIN_RX_AUDIO_MUX	GPIOD, GPIO_PIN_9	// high = HR_C6000 line out to the amp (MD-2017: receiver A's audio on)
+#if UVF_MD2017
+#define PIN_RXB_AUDIO		GPIOD, GPIO_PIN_8	// receiver B's audio on the same line (hardware-md2017.md 2.3): kept low
+#endif
 #define PIN_LED_GREEN		GPIOE, GPIO_PIN_0
 #define PIN_LED_RED		GPIOE, GPIO_PIN_1
 #define PIN_CTCSS_PWM		GPIOC, GPIO_PIN_7	// unused, idles high (open drain)
 #define PIN_BEEP_PWM		GPIOC, GPIO_PIN_8	// unused, idles low
 
+#if UVF_MD2017
+// The two AT1846S on PB6 / PB7, I2C1's pins (the TYT image bit-bangs them; hardware-md2017.md 2): receiver A at 0x2E
+#define PIN_RF_SCL		GPIOB, GPIO_PIN_6	// AF4 open drain
+#define PIN_RF_SDA		GPIOB, GPIO_PIN_7	// AF4 open drain
+#define UVF_RF_I2C		I2C1
+#define UVF_RF_I2C_AF		GPIO_AF4_I2C1
+#define UVF_RF_I2C_CLK_ENABLE()	__HAL_RCC_I2C1_CLK_ENABLE()
+#define AT1846S_B_I2C_ADDR	0x71	// receiver B
+#else
 // AT1846S on I2C3
-#define PIN_I2C3_SCL		GPIOA, GPIO_PIN_8	// AF4 open drain
-#define PIN_I2C3_SDA		GPIOC, GPIO_PIN_9	// AF4 open drain
+#define PIN_RF_SCL		GPIOA, GPIO_PIN_8	// AF4 open drain
+#define PIN_RF_SDA		GPIOC, GPIO_PIN_9	// AF4 open drain
+#define UVF_RF_I2C		I2C3
+#define UVF_RF_I2C_AF		GPIO_AF4_I2C3
+#define UVF_RF_I2C_CLK_ENABLE()	__HAL_RCC_I2C3_CLK_ENABLE()
+#endif
 #define AT1846S_I2C_ADDR	0x2E
 
 // HR_C6000
 #define PIN_C6000_CS		GPIOE, GPIO_PIN_2
+#if UVF_MD2017	// hardware-md2017.md 3.1
+#define PIN_C6000_CLK		GPIOC, GPIO_PIN_13
+#define PIN_C6000_MOSI		GPIOE, GPIO_PIN_5
+#define PIN_C6000_MISO		GPIOE, GPIO_PIN_3
+#else
 #define PIN_C6000_CLK		GPIOE, GPIO_PIN_3
 #define PIN_C6000_MOSI		GPIOE, GPIO_PIN_4
 #define PIN_C6000_MISO		GPIOE, GPIO_PIN_5
+#endif
 #define PIN_C6000_PWD		GPIOE, GPIO_PIN_6	// high = powered down
 #define PIN_C6000_VCS		GPIOB, GPIO_PIN_12	// voice SPI2 chip select
 #define PIN_C6000_TS_INT	GPIOC, GPIO_PIN_0
@@ -63,7 +101,9 @@
 // LCD on FSMC bank 1 (data lines double as keypad columns)
 #define PIN_LCD_CS		GPIOD, GPIO_PIN_6
 #define PIN_LCD_RST		GPIOD, GPIO_PIN_13
-#if defined(RFOUNDRY_POWER_10W) && RFOUNDRY_POWER_10W
+#if UVF_MD2017
+#define PIN_LCD_BACKLIGHT	GPIOE, GPIO_PIN_4	// hardware-md2017.md 3.1
+#elif defined(RFOUNDRY_POWER_10W) && RFOUNDRY_POWER_10W
 #define PIN_LCD_BACKLIGHT	GPIOC, GPIO_PIN_6	// the 10 W radio
 #else
 #define PIN_LCD_BACKLIGHT	GPIOD, GPIO_PIN_8

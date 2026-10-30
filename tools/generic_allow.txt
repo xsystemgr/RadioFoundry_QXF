@@ -133,3 +133,5 @@ tests/hil/test_split_duplex.py per-radio skip reasons and bench notes
 
 # One section of a generic doc that names radios on purpose (owner-approved): path#anchor, that section only.
 docs/spec/sfr.md#6-known-issues-by-radio the per-radio known issues of the experimental standalone SFR
+docs/spec/codeplug-stock-tyt.md qdmr's dmrconf radio keys are named as qdmr spells them (uv390, md2017)
+docs/spec/open-firmware-cps.md the radio type table lists the radio names the open-firmware CPS uses for each type

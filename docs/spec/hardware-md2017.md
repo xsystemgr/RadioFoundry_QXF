@@ -46,6 +46,24 @@ Cross-check build: `MD-UV390-AESGPS-REC-S119.38.bin`, 1365504 bytes, SHA-256
 codec-mduv380.md's list. Its codec fits the 10 W S219.74 GPS-REC map: code 0x0808A49C + 0xF38E (`6f96ad22...fbda31`),
 tables 0x080E7C1C..0x080FA396 (0x1277A, `cba4a2ea...3559f7`), every island ref and branch checked.
 
+### 1.2 Where the merge puts it
+
+The map comes from the V4.05 disassembly: every pc-relative literal, BL and movw/movt in the code window and the two
+islands. 1 self ref, 74 table refs, 2 island pointers, 4 island refs, 12 BLs from the islands into the code; no call
+out of the codec on any path the emulator runs. The window also holds application code the codec never runs (two
+gaps, 0x080761D0..0x080773E6 and 0x0807A82C..0x0807B63E, with calls to the GPIO routines); their three table words
+aren't listed, which is safe because the tables don't move.
+
+| | address | length | CRC-32 placed |
+|---|---|---|---|
+| tables (stock address, cut to the codec's data) | 0x080D2AF4 | 0x11F56 | 0x08F19F1D |
+| code (right after, word aligned) | 0x080E4A4C | 0xF6E2 | 0xA0E05F0C |
+| descriptor | 0x080FFF80 | 0x80 | tag 0x00550405 |
+
+Run in the emulator as placed (the moved code, the cut tables, nothing else mapped): the same bits and PCM as the
+stock-placed codec (1.1). `boards/md2017/vocoder_md2017.c` holds the same numbers; `make BOARD=md2017` with the V4.05
+file in `codecs/` writes `_codec.bin`.
+
 ## 2. RF chips: two AT1846S on one bus
 
 The image drives **two** AT1846S on one bit-banged I2C bus (image):
@@ -169,7 +187,7 @@ From every GPIO_Init (mode), GPIO_PinAFConfig (alternate function) and read / wr
 | R2 | ~~DMR input~~: the selected receiver alone, either one (2.3); confirm on the radio | |
 | R3 | ~~Each receiver's band supplies~~: done (2.2) | |
 | R4 | ~~Backlight and the C6000 bus~~: PE4, and CS PE2 / CLK PC13 / MOSI PE5 / MISO PE3 (3.1). Still (?): PA13, PA15, PB0-PB2, PB10, PD10, PD11, PE13, PE15 (keys and a second knob likely) | on the radio, with a pin-state readout |
-| R5 | ~~The codec windows of V4.05~~: found and run in the emulator (1.1). Still to do: its codec map (`codec_maps/md2017/`) and the profile in `stockfw.PROFILES`, whose placement waits for the board's memory layout | with boards/md2017 |
+| R5 | ~~The codec of V4.05~~: windows (1.1), map `codec_maps/md2017/md2017-v405.json`, profile in `stockfw.PROFILES` (1.2) | done on the host; DMR receive on the radio is bring-up stage 4 |
 | R6 | Bootloader entry keys and DFU loader (expected the MD-UV380's: PTT and the top side key at power on) | on the radio |
 
 ## 5. Sources

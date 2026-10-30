@@ -13,8 +13,9 @@
 #include "modem/hrc_common/hrc.h"
 
 typedef struct {
-	GPIO_TypeDef *port;	// the configuration port's four lines
-	uint16_t cs, clk, mosi, miso;	// pin masks on port (MOSI: MCU to chip)
+	GPIO_TypeDef *port;	// the configuration port's lines
+	uint16_t cs, clk, mosi, miso;	// pin masks on port (MOSI: MCU to chip); clk on clk_port when that is set
+	GPIO_TypeDef *clk_port;	// the clock's port when it isn't port (a board whose clock is on another port), or NULL
 	SPI_TypeDef *voice_spi;	// voice port: SPI master, clock idle high, data on the first edge
 	uint8_t voice_br;	// its clock: PCLK / 2^(br + 1)
 	GPIO_TypeDef *voice_cs_port;
