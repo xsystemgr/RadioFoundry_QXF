@@ -58,6 +58,10 @@ typedef struct {
 	void (*bridge)(void);
 	// Optional: restart the second SoC (RX2_RESET)
 	void (*restart)(void);
+	// Optional, NULL where the two can't share the speaker: both receivers' calls heard at once (true), or only one,
+	// the selected channel first (false, the default). With it on, the core gives the second receiver the speaker
+	// whenever it has its channel, not only while the selected one is quiet
+	void (*mix)(bool on);
 } hal_rx2_t;
 
 #endif

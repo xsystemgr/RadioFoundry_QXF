@@ -203,7 +203,8 @@ uint32_t ui_svc_feat_radio(void)
 	return (CONFIG_SCAN ? UI_FEAT_SCAN : 0) | (CONFIG_DMR_ROAMING ? UI_FEAT_ROAMING : 0) |
 	       (motor ? UI_FEAT_VIBRATE : 0) | (radio_volume_soft() ? UI_FEAT_VOLUME : 0) |
 	       (radio_bcast_capable() ? UI_FEAT_BCAST : 0) |
-	       (CONFIG_AM_RX && radio_am_capable() && board.radio->am_mode != NULL ? UI_FEAT_AM_MODE : 0);
+	       (CONFIG_AM_RX && radio_am_capable() && board.radio->am_mode != NULL ? UI_FEAT_AM_MODE : 0) |
+	       (CONFIG_DUAL_WATCH && board.rx2 != NULL && board.rx2->mix != NULL ? UI_FEAT_DUAL_MIX : 0);
 }
 
 #if CONFIG_DMR
@@ -452,6 +453,9 @@ void ui_svc_apply(uint8_t id, int32_t value)
 #if CONFIG_DUAL_WATCH
 	case UI_SET_DUAL_DELAY_MS:	// the radio core clamps
 		rs.dual_delay_ms = v16;
+		break;
+	case UI_SET_DUAL_MIX:
+		rs.dual_mix = v16 != 0;
 		break;
 #endif
 	case UI_SET_BACKLIGHT_S:		// dims after this, goes off after four times as long (0 = always on)

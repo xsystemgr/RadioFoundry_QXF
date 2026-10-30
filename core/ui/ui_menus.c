@@ -4034,6 +4034,8 @@ static const char *const n_am_mode[] = { "Baofeng stock", "Stock, AF 0740", "Sto
 #if CONFIG_DUAL_WATCH
 static const int16_t v_dual_wait[] = { 500, 1000, 1500, 2000, 3000, 5000 };	// ms
 static const char *const n_dual_wait[] = { "0.5 s", "1 s", "1.5 s", "2 s", "3 s", "5 s" };
+static const int16_t v_dual_mix[] = { 0, 1 };	// radio_settings_t.dual_mix
+static const char *const n_dual_mix[] = { "One", "Both" };
 #endif
 static const int16_t v_autooff[] = { 0, 30, 60, 120 };
 static const char *const n_autooff[] = { "Off", "30 min", "1 h", "2 h" };
@@ -4116,6 +4118,7 @@ static const set_item_t s_talk[] = {
 #if CONFIG_DUAL_WATCH
 	TOGGLE("Dual watch talk back", "reply other channel A B", UI_SET_DUAL_TALK_BACK),
 	LIST("Dual watch delay", "resume wait reply A B", UI_SET_DUAL_DELAY_MS, v_dual_wait, n_dual_wait),
+	LIST("Dual watch audio", "both mix two receivers A B", UI_SET_DUAL_MIX, v_dual_mix, n_dual_mix),
 #endif
 #if CONFIG_SFR
 	LIST("SFR receive", "single frequency repeater both copies dual-path rx", UI_SET_SFR_RX, v_sfrrx, n_sfrrx),
@@ -4244,6 +4247,8 @@ static bool set_hidden(const set_item_t *s)
 		return !(feats() & UI_FEAT_BCAST);
 	if (s->type != ST_ACTION && s->id == UI_SET_AM_MODE)
 		return !(feats() & UI_FEAT_AM_MODE);
+	if (s->type != ST_ACTION && s->id == UI_SET_DUAL_MIX)
+		return !(feats() & UI_FEAT_DUAL_MIX);	// a radio with two receivers that can share the speaker
 	return !board_has_battery() && s->type != ST_ACTION &&
 	       (s->id == UI_SET_BATTERY_SAVER || s->id == UI_SET_LOW_BATTERY);
 }

@@ -208,7 +208,7 @@ typedef struct {
 	uint8_t rs_bcast_step;		// radio_settings_t.bcast_step + 1, 0 = the default (200 kHz on the odd tenths)
 	uint8_t zs_offers;		// zone share offers: 0 Off (the default), 1 Ask (docs/spec/zone-share.md 5)
 	uint8_t rs_am_mode;		// radio_settings_t.am_mode + 1, 0 = the default (the radio's own AM set-up; was reserved8[0])
-	uint8_t reserved8[1];
+	uint8_t rs_dual_mix;		// radio_settings_t.dual_mix + 1, 0 = the default (off; was reserved8[1])
 	// The IP gateway's off-net route (dmrDataSettings_t.ipGatewayId, docs/spec/usb-network.md 3.1; appended for
 	// ip-addr), taken with the other ds_ fields: the gateway radio's DMR ID, 0 = off-net packets dropped
 	uint32_t ds_ip_gateway;

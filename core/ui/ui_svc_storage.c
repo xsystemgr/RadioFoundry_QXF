@@ -164,6 +164,9 @@ int32_t ui_svc_setting_get(uint8_t id)
 	case UI_SET_DUAL_DELAY_MS:
 		radio_get_settings(&rs);
 		return rs.dual_delay_ms;
+	case UI_SET_DUAL_MIX:
+		radio_get_settings(&rs);
+		return rs.dual_mix ? 1 : 0;
 #endif
 #if CONFIG_BCAST_FM
 	case UI_SET_BCAST_STEP:
@@ -339,6 +342,7 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 #endif
 #if CONFIG_DUAL_WATCH
 	case UI_SET_DUAL_DELAY_MS:
+	case UI_SET_DUAL_MIX:
 #endif
 #if CONFIG_BCAST_FM
 	case UI_SET_BCAST_STEP:

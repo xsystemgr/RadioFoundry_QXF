@@ -60,7 +60,9 @@ VFO. It is two frequencies, not the two timeslots of one DMR frequency.
   and forth between them.
 - Most radios have one receiver, so they alternate between A and B. A call on one can be missed while the radio is on
   the other. A radio with a second receiver hears both FM channels at once and shows a call on each: "Receiving on
-  B, muted" while A plays. A DMR channel on either side still alternates, since the radio has one DMR decoder
+  B, muted" while A plays. **Settings › Talk & listen › Dual watch audio** chooses what the speaker plays then:
+  **One** (the selected channel first, the other muted) or **Both** (both calls at once). A DMR channel on either
+  side still alternates, since the radio has one DMR decoder
   ([Radio reference](23-radios.md#dual-watch-on-each-radio)).
 
 ### Start it

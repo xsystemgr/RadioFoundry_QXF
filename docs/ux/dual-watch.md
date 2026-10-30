@@ -104,7 +104,10 @@ its own receiver (the second one has its channel: `ui_dual_t.own`), under the pa
 quiet or not: "A" and "B" with the meter and the level in dBm, green while that pane receives, and "mute" on the
 one not heard while both receive; where there is room for one line only, both meters share it, half each ("A ▮▮▮▯ B
 ▮▯▯▯"). Before the second receiver has its channel, a line per receiving pane: "Receiving on A" with its meter, and
-"Receiving on B, muted" for the one that is not heard; one line only: "Receiving on A and B". The strip says RX. Gallery: `home_dual_two_rx`,
+"Receiving on B, muted" for the one that is not heard; one line only: "Receiving on A and B". The strip says RX.
+Where the receivers can share the speaker (`UI_FEAT_DUAL_MIX`, `hal_rx2_t.mix`), Settings › Talk & listen › Dual
+watch audio is One (the default: the selected channel's call, the other muted) or Both (both calls heard at once,
+neither pane says mute). Gallery: `home_dual_two_rx`,
 `home_dual_two_rx_large_text`. The simulator has `receivers:2`, `rxa:` / `rxb:` and the `rxaend` / `rxbend` tokens; uiFlowTest
 checks a call on each, one ending (the other is then the one heard, and the ended call is listed), and talking on B.
 

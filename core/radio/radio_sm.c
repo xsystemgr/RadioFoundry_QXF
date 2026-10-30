@@ -394,7 +394,8 @@ static void outputs(radio_sm_t *sm)
 #if CONFIG_DUAL_WATCH
 	// The second receiver has the speaker while the selected channel is quiet: that one's calls always win
 	if (board.rx2 != NULL) {
-		int8_t on = (int8_t)(sm->rx2_on && !tx && !green);
+		bool mix = sm->set.dual_mix && board.rx2->mix != NULL;	// both heard: the speaker isn't the selected one's alone
+		int8_t on = (int8_t)(sm->rx2_on && !tx && (!green || mix));
 		if (sm->rx2_audio_out != on) {
 			sm->rx2_audio_out = on;
 			board.rx2->audio(on != 0);
@@ -4419,6 +4420,9 @@ static void settings_to_radio(const settings_t *st, radio_settings_t *s)
 		s->bcast_step = (uint8_t)(st->rs_bcast_step - 1u);
 		clamp_settings(s);
 	}
+	if (st->rs_dual_mix != 0) {
+		s->dual_mix = st->rs_dual_mix > 1u;
+	}
 	if (st->rs_am_mode != 0) {
 		s->am_mode = (uint8_t)(st->rs_am_mode - 1u);
 		clamp_settings(s);
@@ -4479,6 +4483,7 @@ static void radio_to_settings(const radio_settings_t *s, uint32_t now_ms)
 	st->rs_dual_delay = (uint8_t)(s->dual_delay_ms / 100u + 1u);
 	st->rs_bcast_step = (uint8_t)(s->bcast_step + 1u);
 	st->rs_am_mode = (uint8_t)(s->am_mode + 1u);
+	st->rs_dual_mix = (uint8_t)(s->dual_mix ? 2u : 1u);
 	st->rs_stored = 1;
 	st->roam_rssi_dbm = s->roam_rssi_dbm;
 	st->roam_hyst_db = s->roam_hyst_db;
@@ -4505,6 +4510,11 @@ static void use_settings(radio_sm_t *sm, const radio_settings_t *s, uint32_t now
 #if CONFIG_AM_RX
 	if (board.radio != NULL && board.radio->am_mode != NULL) {
 		board.radio->am_mode(sm->set.am_mode);	// the board retunes when AM is on
+	}
+#endif
+#if CONFIG_DUAL_WATCH
+	if (board.rx2 != NULL && board.rx2->mix != NULL) {
+		board.rx2->mix(sm->set.dual_mix);
 	}
 #endif
 #if CONFIG_DMR_ROAMING
@@ -4696,6 +4706,11 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 #if CONFIG_AM_RX
 	if (board.radio != NULL && board.radio->am_mode != NULL) {
 		board.radio->am_mode(sm->set.am_mode);	// before the first tune
+	}
+#endif
+#if CONFIG_DUAL_WATCH
+	if (board.rx2 != NULL && board.rx2->mix != NULL) {
+		board.rx2->mix(sm->set.dual_mix);
 	}
 #endif
 #if CONFIG_DMR_ROAMING

@@ -103,6 +103,7 @@ static struct {
 	bool tuned;		// on t's settings
 	bool open;		// squelch open (and the RX tone, if any)
 	bool audio_on;		// the core gives it the speaker
+	bool mix;		// both receivers heard at once (hal_rx2_t.mix): A stays on while its own squelch is open
 	bool play;		// its audio on the line now (audio_on and open)
 	bool uhf;
 	uint8_t close_count;
@@ -610,9 +611,12 @@ static void speaker_apply(void)
 		if (pcm) {
 			pcm_codec_on();
 		}
-#if UVF_MD2017
-		PIN_WRITE(PIN_RXB_AUDIO, b);		// receiver B's audio, and A's off meanwhile
-		PIN_WRITE(PIN_RX_AUDIO_MUX, !b);
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+		PIN_WRITE(PIN_RXB_AUDIO, b);		// receiver B's audio, and A's off meanwhile unless both are heard
+		PIN_WRITE(PIN_RX_AUDIO_MUX, !b || (rb.mix && audio_wanted));
+#elif UVF_MD2017
+		(void)b;
+		PIN_WRITE(PIN_RX_AUDIO_MUX, true);
 #else
 		(void)b;
 		PIN_WRITE(PIN_RX_AUDIO_MUX, true);	// HR_C6000 line out to the amp
@@ -628,9 +632,21 @@ static void speaker_apply(void)
 	}
 }
 
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+static void rb_mute_apply(void);
+#endif
+
 static void audio(bool on)
 {
+	bool was = audio_wanted;
 	audio_wanted = on;
+#if UVF_MD2017 && CONFIG_DUAL_WATCH
+	if (rb.play && rb.mix && was != on) {
+		rb_mute_apply();	// both heard: receiver A's own squelch opens or closes its audio
+	}
+#else
+	(void)was;
+#endif
 	speaker_apply();
 }
 
@@ -657,7 +673,8 @@ static void rb_mute_apply(void)
 	}
 	if (r.mode == RADIO_MODE_FM && r.rx_valid && !r.tx_on && !r.asleep) {
 		uint16_t v = (uint16_t)(at1846s_state_value(rf_bw(r.rx_bw), AT1846S_STATE_RX) | r.rf.rx_extra);
-		count(at1846s_write_force(&r.rf, 0, 0x30, rb.play ? (uint16_t)(v | RF_AF_MUTE) : v));
+		bool mute_a = rb.play && !(rb.mix && audio_wanted);	// mixing: A only while its own squelch is open
+		count(at1846s_write_force(&r.rf, 0, 0x30, mute_a ? (uint16_t)(v | RF_AF_MUTE) : v));
 	}
 }
 
@@ -754,6 +771,15 @@ static void rb_audio(bool on)
 	rb_play_update();
 }
 
+static void rb_mix(bool on)
+{
+	if (on != rb.mix) {
+		rb.mix = on;
+		rb_mute_apply();
+		speaker_apply();
+	}
+}
+
 // Receiver B is read every RB_POLL_EVERY main polls (25 ms each: 100 ms), every RB_POLL_PLAYING while receiver A's
 // audio plays: fewer I2C transfers on the bus both chips share while audio is on (bench 2026-10-30: noise in dual
 // watch). Its squelch still closes after three reads in a row
@@ -840,6 +866,7 @@ const hal_rx2_t uvf_rx2 = {
 	.stop = rb_stop,
 	.status = rb_status,
 	.audio = rb_audio,
+	.mix = rb_mix,
 };
 #endif
 
@@ -1008,7 +1035,7 @@ static bool rx(uint32_t hz, radio_bw_t bw, const subtone_t *rx_tone)
 	count(at1846s_set_state(&r.rf, AT1846S_STATE_RX));
 #if UVF_MD2017 && CONFIG_DUAL_WATCH
 	if (rb.play) {
-		rb_mute_apply();	// receiver B plays: A stays muted
+		rb_mute_apply();	// receiver B plays: A stays muted (unless both are heard and A's squelch is open)
 	}
 #endif
 	r.rf_tuned_hz = hz;

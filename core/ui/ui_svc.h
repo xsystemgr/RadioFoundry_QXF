@@ -36,6 +36,7 @@
 #define UI_FEAT_BCAST		(1u << 18)	// a broadcast FM receiver (radio_bcast_capable): its VFO step setting
 #define UI_FEAT_ZONE_SHARE	(1u << 19)	// ui_svc_zone_* (zone sharing over DMR data, CONFIG_ZONE_SHARE)
 #define UI_FEAT_AM_MODE		(1u << 20)	// the board offers AM demodulation variants (hal_radio_t.am_mode)
+#define UI_FEAT_DUAL_MIX	(1u << 21)	// two receivers that can share the speaker (hal_rx2_t.mix): Dual watch audio
 uint32_t ui_svc_features(void);
 // The parts of it each package reports (ui_svc_features ORs them): dmr-voice / radio core, dmr-data, storage-cps,
 // radio-features
@@ -295,6 +296,7 @@ typedef enum {
 	UI_SET_ZONE_OFFERS,	// zone share offers from other radios: 0 Off (the default), 1 Ask (settings_t.zs_offers)
 	UI_SET_DMR_ID,		// the radio's own DMR ID in the codeplug, 1..CODEPLUG_DMR_ID_MAX (a set is a codeplug write job)
 	UI_SET_AM_MODE,		// AM demodulation, experimental: RADIO_AM_MODE_* (Settings > Talk, CONFIG_AM_RX; radio_settings_t.am_mode)
+	UI_SET_DUAL_MIX,	// dual watch on two receivers: 0 the selected channel first, 1 both heard (radio_settings_t.dual_mix)
 	UI_SET_COUNT
 } ui_setting_t;
 
