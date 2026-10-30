@@ -1415,9 +1415,13 @@ static void draw_dmr_call(const radio_view_t *v, const ui_state_t *s)
 	if (d->state == RDMR_RX_OTHER && !d->call.encrypted) {
 		// Where the call goes, with why it isn't ours: "TG 3100: not ours", "Private 3105555: not ours"
 		sb_init(&b, buf, sizeof buf);
-		sb_str(&b, d->call.group ? "TG " : "Private ");
-		sb_u32(&b, d->call.dst, 1);
-		sb_str(&b, ": not ours");
+		if (d->call.src != 0 && d->call.src == d->own_id) {
+			sb_str(&b, "Our own ID: not played");	// a repeater's echo of us, or a radio with our ID
+		} else {
+			sb_str(&b, d->call.group ? "TG " : "Private ");
+			sb_u32(&b, d->call.dst, 1);
+			sb_str(&b, ": not ours");
+		}
 		y = call_line(L->small, y, buf, ui_col.warn);
 	} else if (why != NULL) {
 		y = call_line(L->small, y, why, ui_col.warn);

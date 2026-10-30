@@ -482,8 +482,9 @@ static bool group_listened(uint32_t tg, uint32_t now)
 
 static bool rx_accept(const dmr_lc_t *l, uint32_t now)
 {
-	if (l->src == s.cfg.own_id)
-		return false;	// our own call echoed (repeater)
+	if (l->src == s.cfg.own_id && s.cfg.rmo)
+		return false;	// our own call echoed (repeater). In direct mode there is no echo: a radio with the same ID
+				// (a second radio of ours programmed alike) is heard
 	if (l->flco == DMR_FLCO_GROUP_VOICE)
 		return group_listened(l->dst, now);
 	return l->dst == s.cfg.own_id || l->dst == DMR_ID_ALL_CALL || s.cfg.listen.hear_all;
