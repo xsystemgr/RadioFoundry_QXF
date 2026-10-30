@@ -58,8 +58,9 @@ VFO. It is two frequencies, not the two timeslots of one DMR frequency.
   goes on after you transmit.
 - Each channel keeps its changes for now (power, squelch, tones, talk target and the like) while the radio goes back
   and forth between them.
-- The radio has one receiver, so it alternates between A and B. A call on one can be missed while the radio is on the
-  other. A radio with two receivers would hear both and show a call on each channel at once. No radio has that yet
+- Most radios have one receiver, so they alternate between A and B. A call on one can be missed while the radio is on
+  the other. A radio with a second receiver hears both FM channels at once and shows a call on each: "Receiving on
+  B, muted" while A plays. A DMR channel on either side still alternates, since the radio has one DMR decoder
   ([Radio reference](23-radios.md#dual-watch-on-each-radio)).
 
 ### Start it

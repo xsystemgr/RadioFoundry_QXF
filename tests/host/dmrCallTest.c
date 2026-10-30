@@ -976,7 +976,7 @@ static void test_rx_filters(void)
 	rx_call(lc, 1, true, 0, 1, true, &frame);
 	CHECK(sink_log.begins == 0);
 
-	// Direct mode has no echo: a second radio programmed with our ID is heard (bench 2026-10-30, MD-2017)
+	// Direct mode has no echo: a second radio programmed with our ID is heard (bench 2026-10-30)
 	c.rmo = false;
 	setup(&c);
 	mk_lc(lc, 0, TG_TALK, OWN_ID);

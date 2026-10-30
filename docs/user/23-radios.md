@@ -69,16 +69,17 @@ On a radio without a key for a job, the menus reach it:
 
 ## Dual watch on each radio
 
-[Dual watch](12-scan.md#dual-watch) listens on two channels, A and B. Every radio built today has one receiver, so
-on every radio it is pseudo dual watch: the radio alternates between A and B. A call on one channel can be missed
-while the radio is on the other. A radio with two receivers would hear both and show a call on each at once. The UI is ready for that (`ui_svc_receivers()` above 1), but no radio reports two receivers
-yet, and the core doesn't use them.
+[Dual watch](12-scan.md#dual-watch) listens on two channels, A and B. A radio with one receiver alternates between A
+and B (pseudo dual watch): a call on one channel can be missed while the radio is on the other. The MD-2017 has a
+second receiver: two FM channels are heard at once, a call shown on each ("Receiving on B, muted" while A plays);
+with a DMR channel on either side it alternates, as its one HR_C6000 decodes one DMR channel.
 
 | Radio | Dual watch | Start | Switch A / B |
 |---|---|---|---|
 | DM-1701 | Pseudo, one receiver. The core's alternation between two channels of one zone is checked on air; the new dual watch (any zone, the VFO, the screens) is not yet | **\***, **7**, or hold **SK2** | **SK2** (a press), **#**, **1** |
 | MD-380 | Pseudo, one receiver. Not checked on air | **\***, **7**, or hold **SK2** | **SK2** (a press), **#**, **1** |
 | MD-UV380 | Pseudo, one receiver (one AT1846S for both bands). Not checked on air | **\***, **7**, or hold **SK2** | **SK2** (a press), **#**, **1** |
+| MD-2017 | True dual watch for two FM channels (receiver B, the second AT1846S); pseudo with a DMR side. Not checked on air yet | **\***, **7** (its side keys not mapped yet) | **#**, **1** |
 | DM-32UV | Pseudo, one receiver. Not checked on air (scan isn't checked on this radio yet) | **\***, **7**, or hold **SK2** | **SK2** (a press), **Left** / **Right** |
 | DB25-D PRO | Pseudo, one receiver. Not checked on air. Its second BK4819 chip is a local oscillator for the receive chain, not a second receiver | Hold the **TONE/T.SEL** key | A press of **TONE/T.SEL** |
 | DM-1801 Pro | Pseudo, one receiver. Not checked on air | Hold the **A/B** key, **\***, **7**, or hold **SK2** | The **A/B** key or **SK2** (a press), **Left** / **Right** |
