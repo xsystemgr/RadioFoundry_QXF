@@ -16,7 +16,35 @@ differs, and what is still open. Facts marked (image) come from reading TYT's `T
 | Application | plain once decrypted, Thumb-2, initial SP 0x20003578, reset handler 0x080E21E9 (image) |
 
 So rfoundry's MD-UV380 file handling (container, key, codec search) is the starting point for this radio; the codec
-window of this build is not mapped yet (?).
+windows are in 1.1.
+
+### 1.1 The codec in V4.05
+
+Found by carrying the MD-UV380 codec maps (`codec_maps/mduv380/`, addresses and offsets only) over to this image: at
+every CODEC_SIG word, a map fits when its self refs point back into the candidate by the map's offsets and its table
+refs into flash. One candidate fits, with the P18.11 CSV-GPS map (code length 0xF6E2, the 18.xx shape). From the code's
+own refs each table object and island gets its new address; then every island ref and every BL from an island into the
+code was checked in the image: all of them hold (measured, 0 mismatches).
+
+| window | flash | length | sha256 |
+|---|---|---|---|
+| code | 0x08075808..0x08084EEA | 0xF6E2 | `dda72c91f42456deac38f596fdfdf5f04c01cac071e177b750f4d7006cbeec49` |
+| tables (the codec's data, first object to the end of the last) | 0x080D2AF4..0x080E4A4A | 0x11F56 | `87d676a7e1b36774a18511dcb10c46c633c88baa206531c2560f3c4f2e013ca4` |
+
+* Not byte-identical to P18.11 with the addresses restored (its code SHA-256 doesn't come out), so it needs a map and a
+  profile of its own.
+* The table objects don't move as one block against P18.11 (seven different shifts, -0x4EB8 to -0x4B80), so the span
+  is 0x338 bytes shorter than P18.11's cut. 46 of the 52 objects are byte-identical to the same objects in the MD-UV390
+  S119.38 file below; the other six differ in a few bytes (object bounds "to next object", ?).
+* **Emulator (measured).** Only these two windows mapped (the rest of each page zero), the hosted init sequence
+  ([codec-mduv380.md](codec-mduv380.md) "Entry points"), then 50 frames of a 1 kHz tone at 8000 peak through encode and
+  decode: no fault, 2000 zero crossings per second (1 kHz), peak 8611. The 49-bit frames and the PCM are bit-identical
+  to the S119.38 codec's run the same way.
+
+Cross-check build: `MD-UV390-AESGPS-REC-S119.38.bin`, 1365504 bytes, SHA-256
+`c99a13b4e0ababe534eafa23fafca636fe1d87187ec3ef49360ddcf7f2f5f657`, application 0xF0000, not yet in
+codec-mduv380.md's list. Its codec fits the 10 W S219.74 GPS-REC map: code 0x0808A49C + 0xF38E (`6f96ad22...fbda31`),
+tables 0x080E7C1C..0x080FA396 (0x1277A, `cba4a2ea...3559f7`), every island ref and branch checked.
 
 ## 2. RF chips: two AT1846S on one bus
 
@@ -141,7 +169,7 @@ From every GPIO_Init (mode), GPIO_PinAFConfig (alternate function) and read / wr
 | R2 | ~~DMR input~~: the selected receiver alone, either one (2.3); confirm on the radio | |
 | R3 | ~~Each receiver's band supplies~~: done (2.2) | |
 | R4 | ~~Backlight and the C6000 bus~~: PE4, and CS PE2 / CLK PC13 / MOSI PE5 / MISO PE3 (3.1). Still (?): PA13, PA15, PB0-PB2, PB10, PD10, PD11, PE13, PE15 (keys and a second knob likely) | on the radio, with a pin-state readout |
-| R5 | The codec windows of V4.05 for rfoundry (a profile in `stockfw.PROFILES`) | the first code word 0x4FF0E92D is a common prologue, so it doesn't locate the codec alone. The codec's tables are the MD-UV380 library's, moved: one MD-UV380 vendor file listed in [codec-mduv380.md](codec-mduv380.md) as a reference finds them in V4.05 by content, then the code window by the table island's references; the emulator check of the MD-UV380 pages confirms the windows |
+| R5 | ~~The codec windows of V4.05~~: found and run in the emulator (1.1). Still to do: its codec map (`codec_maps/md2017/`) and the profile in `stockfw.PROFILES`, whose placement waits for the board's memory layout | with boards/md2017 |
 | R6 | Bootloader entry keys and DFU loader (expected the MD-UV380's: PTT and the top side key at power on) | on the radio |
 
 ## 5. Sources
