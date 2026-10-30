@@ -1412,7 +1412,14 @@ static void draw_dmr_call(const radio_view_t *v, const ui_state_t *s)
 	// Then why it isn't heard, or where the call goes ("TG 91 World")
 	const char *why = d->state == RDMR_RX_OTHER ? (d->call.encrypted ? "Encrypted: not played" :
 		"Other TG: not played") : !d->codec ? "No codec: voice off" : NULL;
-	if (why != NULL) {
+	if (d->state == RDMR_RX_OTHER && !d->call.encrypted) {
+		// Where the call goes, with why it isn't ours: "TG 3100: not ours", "Private 3105555: not ours"
+		sb_init(&b, buf, sizeof buf);
+		sb_str(&b, d->call.group ? "TG " : "Private ");
+		sb_u32(&b, d->call.dst, 1);
+		sb_str(&b, ": not ours");
+		y = call_line(L->small, y, buf, ui_col.warn);
+	} else if (why != NULL) {
 		y = call_line(L->small, y, why, ui_col.warn);
 	} else {
 		sb_init(&b, buf, sizeof buf);
