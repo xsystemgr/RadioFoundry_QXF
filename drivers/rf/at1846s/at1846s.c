@@ -189,6 +189,7 @@ void at1846s_attach(at1846s_t *dev, const at1846s_bus_t *bus)
 	dev->bw = -1;
 	dev->mode = -1;
 	dev->state = AT1846S_STATE_OFF;
+	dev->rx_extra = 0;
 }
 
 static bool select_page(at1846s_t *dev, uint8_t page)
@@ -333,7 +334,8 @@ bool at1846s_set_freq(at1846s_t *dev, uint32_t hz)
 
 bool at1846s_set_state(at1846s_t *dev, at1846s_state_t state)
 {
-	bool ok = at1846s_write_force(dev, 0, REG_CTRL, at1846s_state_value(cur_bw(dev), state));
+	uint16_t v = at1846s_state_value(cur_bw(dev), state);
+	bool ok = at1846s_write_force(dev, 0, REG_CTRL, state == AT1846S_STATE_RX ? (uint16_t)(v | dev->rx_extra) : v);
 	dev->state = (uint8_t)state;
 	return ok;
 }

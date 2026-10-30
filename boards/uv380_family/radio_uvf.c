@@ -316,7 +316,7 @@ static bool rf_to_rx(void)
 		r.rf_direct = false;
 		(void)hrc_write(&r.modem, 4, 0x04, (uint8_t)r.rf_ref);
 		rx_supply(true, r.rx_uhf);
-		if (rf_isr_write(0x30, at1846s_state_value(rf_bw(r.rx_bw), AT1846S_STATE_RX))) {
+		if (rf_isr_write(0x30, at1846s_state_value(rf_bw(r.rx_bw), AT1846S_STATE_RX) | r.rf.rx_extra)) {
 			r.rf_rx_pending = false;
 			return true;
 		}
@@ -338,7 +338,7 @@ static bool rf_to_rx(void)
 		}
 	}
 	rx_supply(true, r.rx_uhf);
-	if (ok && rf_isr_write(0x30, at1846s_state_value(rf_bw(r.rx_bw), AT1846S_STATE_RX))) {
+	if (ok && rf_isr_write(0x30, at1846s_state_value(rf_bw(r.rx_bw), AT1846S_STATE_RX) | r.rf.rx_extra)) {
 		r.rf_rx_pending = false;
 		return true;
 	}
@@ -599,6 +599,7 @@ static void init(void)
 	uint32_t pwd_ms = hal_millis();
 
 	at1846s_attach(&r.rf, &rf_bus);
+	r.rf.rx_extra = UVF_AT1846S_RX_EXTRA;	// pins.h: the MD-2017's TYT image sets 0x30 bit 7 with the receiver on
 	count(at1846s_init(&r.rf));
 
 	while ((uint32_t)(hal_millis() - pwd_ms) < C6000_PWD_WAIT_MS) {

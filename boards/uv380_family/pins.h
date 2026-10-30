@@ -74,6 +74,13 @@
 #define UVF_RF_I2C_CLK_ENABLE()	__HAL_RCC_I2C3_CLK_ENABLE()
 #endif
 #define AT1846S_I2C_ADDR	0x2E
+// Bits ORed into the AT1846S reg 0x30 in RX: the MD-2017's TYT image sets bit 7 whenever it opens a receiver's
+// audio, analog or digital (hardware-md2017.md 2.3); the MD-UV390's doesn't. MD2017_RX_BIT7=0 builds without it
+#if UVF_MD2017 && (!defined(MD2017_RX_BIT7) || MD2017_RX_BIT7)
+#define UVF_AT1846S_RX_EXTRA	0x0080u
+#else
+#define UVF_AT1846S_RX_EXTRA	0x0000u
+#endif
 
 // HR_C6000
 #define PIN_C6000_CS		GPIOE, GPIO_PIN_2

@@ -50,6 +50,7 @@ typedef struct {
 	int8_t mode;		// at1846s_mode_t applied, -1 none yet
 	uint8_t state;		// at1846s_state_t last set
 	uint8_t tx_tone;	// at1846s_tone_t of the last at1846s_set_tx_tone()
+	uint16_t rx_extra;	// bits ORed into reg 0x30 in the RX state (a board's own; 0 by default)
 } at1846s_t;
 
 // --- Pure helpers (no chip access) ---
