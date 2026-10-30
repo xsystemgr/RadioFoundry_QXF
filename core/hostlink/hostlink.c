@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
 // The host link task (see hostlink.h)
+#include <string.h>
 #include "config.h"
 #include "hostlink/hostlink.h"
 #include "board.h"
@@ -369,13 +370,27 @@ static void ppp_begin(bool active, uint32_t now)
 // The port's bytes go to PPP while it runs; in idle mode a request starting with the PPP flag (pppd's first LCP frame)
 // starts it. Returns the bytes PPP took: the rest (none, or what follows the end of the link) is the other protocols'.
 // Only the port's bytes come here, never UDP serial ones
+// Windows' dial-up over "Communications cable between two computers" (RAS direct connection) sends "CLIENT" and
+// starts PPP once it reads "CLIENTSERVER" back (docs/spec/ppp.md 5.1)
+#define RAS_CLIENT		"CLIENT"
+#define RAS_SERVER		"CLIENTSERVER"
+
 static size_t port_ppp(const uint8_t *buf, size_t len, uint32_t now)
 {
 	if (!ppp_on) {
 		bool boundary = side_ended || ((now - last_byte_ms) >= CPS_GAP_MS);
 
-		if ((buf[0] != PPP_FLAG) || (mode != HOSTLINK_IDLE) || !boundary || hostlink_network_mode() ||
+		if ((mode != HOSTLINK_IDLE) || !boundary || hostlink_network_mode() ||
 		    ((side != NULL) && side->in_frame(now))) {
+			return 0;
+		}
+		size_t ras = sizeof RAS_CLIENT - 1u;
+		if ((len >= ras) && (memcmp(buf, RAS_CLIENT, ras) == 0)) {
+			hostlink_write((const uint8_t *)RAS_SERVER, sizeof RAS_SERVER - 1u);
+			ppp_begin(false, now);	// Windows' LCP request follows; the rest of the read is the handshake's
+			return len;
+		}
+		if (buf[0] != PPP_FLAG) {
 			return 0;
 		}
 		ppp_begin(false, now);

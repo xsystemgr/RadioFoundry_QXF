@@ -156,6 +156,19 @@ python3 tools/tftp_client.py ...                     # tftp.md
 
 `sudo kill $(cat /var/run/ppp7.pid)` hangs up (LCP Terminate); the radio goes back to the serial protocols.
 
+### 5.1 Windows
+
+Windows has no pppd, but its dial-up client speaks PPP over a null-modem cable as a "Communications cable between two
+computers" modem (RAS direct connection). That client first sends `CLIENT` and starts PPP when `CLIENTSERVER` comes
+back. The host link answers it: in idle mode, at a request boundary, a read that starts with `CLIENT` gets
+`CLIENTSERVER` and starts passive PPP; the rest of that read is the handshake's (`core/hostlink/hostlink.c`). Its
+LCP request carries callback (13), MRRU (17), short sequence numbers (18) and an endpoint discriminator (19), its
+IPCP request the DNS and NBNS options: all rejected, as for any peer (`tests/host/pppTest.c` test_windows_client).
+
+`tools/rfoundry_ppp_windows.ps1 -Setup COMx` lists the one-time setup (the modem, a dial-up entry without the
+default gateway and without encryption); without it, run as administrator, the script dials the entry and adds the
+routes to 12.0.0.0/8 and 225.0.0.0/8 on the PPP interface. Untested on a Windows host so far.
+
 ## 6. Throughput at 115200 baud
 
 The UART carries 11,520 bytes/s each way. With ACCM 0 a frame costs 8 bytes (flags, `FF 03`, protocol, FCS) plus an

@@ -452,6 +452,62 @@ static void test_negotiation(void)
 	CHECK((s.lcp == PPP_OPENED) && (s.ipcp == PPP_OPENED));
 }
 
+// The Windows dial-up client (RAS over "Communications cable between two computers", ppp.md 5.1): its LCP request
+// carries callback, multilink (MRRU, short sequence numbers) and an endpoint discriminator, its IPCP request the DNS
+// and NBNS options and VJ. All rejected, and the link opens on what is left
+static void test_windows_client(void)
+{
+	uint8_t d[64], id, rid;
+	int n, k;
+
+	out_len = out_pos = 0;
+	ppp_start(false, 5, now_ms, rxbuf);
+	peer_accm = 0;
+	k = opt16(d, 1, 1500);
+	k += opt32(d + k, 2, 0);
+	k += opt32(d + k, 5, 0x5157494Eu);
+	d[k++] = 7; d[k++] = 2;				// PFC
+	d[k++] = 8; d[k++] = 2;				// ACFC
+	d[k++] = 13; d[k++] = 3; d[k++] = 6;		// callback, by the CBCP
+	k += opt16(d + k, 17, 1614);			// MRRU
+	d[k++] = 18; d[k++] = 2;			// short sequence numbers
+	d[k++] = 19; d[k++] = 7; d[k++] = 1; d[k++] = 'W'; d[k++] = 'I'; d[k++] = 'N'; d[k++] = '!';	// endpoint
+	peer_ctl(LCP, CONF_REQ, 1, d, k);
+	CHECK(expect(LCP, CONF_REQ, &rid, d, &n));
+	uint8_t req[64];
+	int rn = n;
+	memcpy(req, d, (size_t)n);
+	CHECK(expect(LCP, CONF_REJ, &id, d, &n));
+	CHECK((id == 1) && find_opt(d, n, 13) && find_opt(d, n, 17) && find_opt(d, n, 18) && find_opt(d, n, 19));
+	CHECK(find_opt(d, n, 1) == NULL && find_opt(d, n, 5) == NULL);
+	k = opt16(d, 1, 1500);
+	k += opt32(d + k, 2, 0);
+	k += opt32(d + k, 5, 0x5157494Eu);
+	peer_ctl(LCP, CONF_REQ, 2, d, k);
+	CHECK(expect(LCP, CONF_ACK, &id, d, &n));
+	peer_ctl(LCP, CONF_ACK, rid, req, rn);
+	CHECK(expect(IPCP, CONF_REQ, &rid, d, &n));
+	// IPCP: address 0.0.0.0, primary and secondary DNS and NBNS, VJ
+	k = opt32(d, 3, 0);
+	k += opt32(d + k, 129, 0);
+	k += opt32(d + k, 130, 0);
+	k += opt32(d + k, 131, 0);
+	k += opt32(d + k, 132, 0);
+	d[k++] = 2; d[k++] = 6; d[k++] = 0x00; d[k++] = 0x2D; d[k++] = 15; d[k++] = 1;
+	peer_ctl(IPCP, CONF_REQ, 1, d, k);
+	CHECK(expect(IPCP, CONF_REJ, &id, d, &n));
+	CHECK(find_opt(d, n, 129) && find_opt(d, n, 130) && find_opt(d, n, 131) && find_opt(d, n, 132) && find_opt(d, n, 2));
+	k = opt32(d, 3, 0);
+	peer_ctl(IPCP, CONF_REQ, 2, d, k);
+	CHECK(expect(IPCP, CONF_NAK, &id, d, &n));
+	CHECK(get32(d + 2) == HOST_IP);
+	peer_ctl(IPCP, CONF_REQ, 3, d, n);
+	CHECK(expect(IPCP, CONF_ACK, &id, d, &n));
+	k = opt32(d, 3, RADIO_IP);
+	peer_ctl(IPCP, CONF_ACK, rid, d, k);
+	CHECK(ppp_ip_up());
+}
+
 static void test_max_failure(void)
 {
 	uint8_t d[64], id;
@@ -1030,6 +1086,7 @@ int main(void)
 
 	test_fcs();
 	test_negotiation();
+	test_windows_client();
 	test_max_failure();
 	test_echo_and_rejects();
 	test_ipv4();
