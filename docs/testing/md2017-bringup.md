@@ -32,7 +32,7 @@ transmit** (`tx_block`: "MD-2017 bring-up: RX only"; `MD2017_DEFS="-DMD2017_TX=1
 
 The keypad matrix is the MD-UV380's and may be wrong. Press each key with the diagnostics page open; note what the UI
 does. The diagnostics page's last two lines show the inputs the TYT image reads whose use is unknown
-(`in` followed by A13 A15 B0 B1 B10 D10 D11 E13 E15, 1 = high): press each side key and turn each knob, and note
+(`A13:1 A15:1 ...`, three lines with E11 (PTT) and E12, 1 = high; PE12, the MD-UV380's external PTT, is not taken as PTT here): press each side key and turn each knob, and note
 which digit moves.
 
 ## 3. Receiver A, FM

@@ -44,37 +44,33 @@ static void init(void)
 	stm32_pin_in(PIN_PORT(PIN_IN_PB0), PIN_MASK(PIN_IN_PB0) | PIN_MASK(PIN_IN_PB1), GPIO_NOPULL);
 	stm32_pin_in(PIN_PORT(PIN_IN_PB10), PIN_MASK(PIN_IN_PB10), GPIO_PULLUP);
 	stm32_pin_in(PIN_PORT(PIN_IN_PD10), PIN_MASK(PIN_IN_PD10) | PIN_MASK(PIN_IN_PD11), GPIO_NOPULL);
-	stm32_pin_in(PIN_PORT(PIN_IN_PE13), PIN_MASK(PIN_IN_PE13) | PIN_MASK(PIN_IN_PE15), GPIO_PULLUP);
+	stm32_pin_in(PIN_PORT(PIN_IN_PE12), PIN_MASK(PIN_IN_PE12) | PIN_MASK(PIN_IN_PE13) | PIN_MASK(PIN_IN_PE15),
+		     GPIO_PULLUP);
 }
 
 #if CONFIG_DIAG
-// "in" and one digit per unknown input, in the order of the label: the levels, for finding what each one is
+// Three lines "A13:1 A15:1 B0:0 B1:0": each unknown input's level (1 = high), for finding what each one is
 static bool diag_line(uint8_t i, char *buf, uint8_t len)
 {
-	static const struct { GPIO_TypeDef *port; uint16_t pin; } in[] = {
-		{ PIN_IN_PA13 }, { PIN_IN_PA15 }, { PIN_IN_PB0 }, { PIN_IN_PB1 }, { PIN_IN_PB10 }, { PIN_IN_PD10 },
-		{ PIN_IN_PD11 }, { PIN_IN_PE13 }, { PIN_IN_PE15 },
+	static const struct { GPIO_TypeDef *port; uint16_t pin; const char *name; } in[] = {
+		{ PIN_IN_PA13, "A13" }, { PIN_IN_PA15, "A15" }, { PIN_IN_PB0, "B0" }, { PIN_IN_PB1, "B1" },
+		{ PIN_IN_PB10, "B10" }, { PIN_IN_PD10, "D10" }, { PIN_IN_PD11, "D11" }, { PIN_IN_PE11, "E11" },
+		{ PIN_IN_PE12, "E12" }, { PIN_IN_PE13, "E13" }, { PIN_IN_PE15, "E15" },
 	};
-	static const char label[] = "A13 A15 B0 B1 B10 D10 D11 E13 E15";
+	const uint8_t per = 4, count = sizeof in / sizeof in[0];
 	uint8_t n = 0;
-	if (len < 2u) {
+	if (len < 2u || i * per >= count) {
 		return false;
 	}
-	if (i == 0) {
-		for (const char *p = label; *p != '\0' && n + 1u < len; p++) {
+	for (uint8_t k = i * per; k < count && k < (i + 1u) * per; k++) {
+		for (const char *p = in[k].name; *p != '\0' && n + 4u < len; p++) {
 			buf[n++] = *p;
 		}
-	} else if (i == 1) {
-		const char *p = "in ";
-		while (*p != '\0' && n + 1u < len) {
-			buf[n++] = *p++;
-		}
-		for (uint8_t k = 0; k < sizeof in / sizeof in[0] && n + 2u < len; k++) {
+		if (n + 3u < len) {
+			buf[n++] = ':';
 			buf[n++] = (in[k].port->IDR & in[k].pin) ? '1' : '0';
 			buf[n++] = ' ';
 		}
-	} else {
-		return false;
 	}
 	buf[n] = '\0';
 	return true;

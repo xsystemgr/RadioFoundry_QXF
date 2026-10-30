@@ -14,6 +14,8 @@
 #define PIN_IN_PB10		GPIOB, GPIO_PIN_10	// pull-up
 #define PIN_IN_PD10		GPIOD, GPIO_PIN_10
 #define PIN_IN_PD11		GPIOD, GPIO_PIN_11
+#define PIN_IN_PE11		GPIOE, GPIO_PIN_11	// PTT (active low), shown too
+#define PIN_IN_PE12		GPIOE, GPIO_PIN_12	// pull-up; the MD-UV380's external PTT, a key here (?)
 #define PIN_IN_PE13		GPIOE, GPIO_PIN_13	// pull-up
 #define PIN_IN_PE15		GPIOE, GPIO_PIN_15	// pull-up
 

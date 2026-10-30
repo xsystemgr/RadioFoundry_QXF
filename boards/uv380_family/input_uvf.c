@@ -33,7 +33,11 @@ static int32_t enc_taken;
 static void init(void)
 {
 	stm32_fsmc_keypad_init(&keypad);
+#ifdef PIN_PTT_EXT
 	stm32_pin_in(PIN_PORT(PIN_PTT), PIN_MASK(PIN_PTT) | PIN_MASK(PIN_PTT_EXT), GPIO_PULLUP);
+#else
+	stm32_pin_in(PIN_PORT(PIN_PTT), PIN_MASK(PIN_PTT), GPIO_PULLUP);
+#endif
 	// Both encoder lines interrupt on both edges (A = PE14 on EXTI14, B = PB11 on EXTI11, both in EXTI15_10)
 	GPIO_InitTypeDef enc_pin = {
 		.Mode = GPIO_MODE_IT_RISING_FALLING,
@@ -57,9 +61,14 @@ static void init(void)
 static uint32_t scan(void)
 {
 	uint32_t raw = stm32_fsmc_keypad_scan(&keypad, NULL);
-	if (!PIN_READ(PIN_PTT) || !PIN_READ(PIN_PTT_EXT)) {
+	if (!PIN_READ(PIN_PTT)) {
 		raw |= 1u << KEY_PTT;
 	}
+#ifdef PIN_PTT_EXT
+	if (!PIN_READ(PIN_PTT_EXT)) {
+		raw |= 1u << KEY_PTT;
+	}
+#endif
 	if (raw == last_raw) {
 		stable = raw;
 	}

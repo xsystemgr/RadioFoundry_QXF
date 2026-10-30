@@ -118,7 +118,9 @@
 
 // PTT and encoder
 #define PIN_PTT			GPIOE, GPIO_PIN_11	// active low
+#if !UVF_MD2017	// the MD-2017 reads PE12 as one of its keys, use unknown (hardware-md2017.md 3.1): not taken as PTT
 #define PIN_PTT_EXT		GPIOE, GPIO_PIN_12	// active low
+#endif
 #define PIN_ENC_A		GPIOE, GPIO_PIN_14
 #define PIN_ENC_B		GPIOB, GPIO_PIN_11	// EXTI11, both edges
 
