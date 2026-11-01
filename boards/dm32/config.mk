@@ -28,3 +28,7 @@ BOARD_UNSUPPORTED += NAND_STORAGE	# the data flash is SPI NOR, GD25Q128 class (d
 # written, unconfirmed"): off by default, and off in ci's maximal configuration too
 BOARD_NOT_WRITTEN += VOX	# no hal_power_t.mic_level hook yet
 BOARD_NOT_WRITTEN += AUDIO_PROBE	# no board.audio_tap yet
+# The single frequency repeater (SFR) is dropped here to make room for fleet admin (OTAP/OTAR): SFR's runner and radio
+# state take about 1.3 KB of main RAM, and this radio keeps only ~0.5 KB free. OTAP and its privacy bands then fit and
+# are on, as on the MD-2017 (docs/spec/otap.md). A radio used as a single-frequency repeater keeps SFR instead
+CONFIG_SFR ?= n

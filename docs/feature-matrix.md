@@ -72,9 +72,9 @@ is `tools/bringup.py list --radio <id>`.
 | `dmr_lrrp` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `dmr_udp_compress` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `dmr_confirmed` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
-| `sfr` | not recorded | pass (seed) | pass (seed) | not recorded | ✕ | not recorded | not recorded |
-| `sfr_dualpath_rx` | not recorded | not recorded | not recorded | not recorded | ✕ | not recorded | not recorded |
-| `sfr_cwid` | not recorded | not recorded | not recorded | not recorded | ✕ | not recorded | not recorded |
+| `sfr` | off | pass (seed) | pass (seed) | not recorded | ✕ | not recorded | not recorded |
+| `sfr_dualpath_rx` | off | not recorded | not recorded | not recorded | ✕ | not recorded | not recorded |
+| `sfr_cwid` | off | not recorded | not recorded | not recorded | ✕ | not recorded | not recorded |
 | `aprs` | pass (seed) | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `aprs_rx` | pass (seed) | not recorded | not recorded | not written | not written | not recorded | not recorded |
 | `aprs_igate` | not recorded | off | not recorded | not written | not written | off | off |
@@ -182,9 +182,9 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `TFTP_IDDB` | ● | ● | ● | ● | ● | ● | ● |
 | `DMR_CONTROL_STATION` | ● | ● | ● | ● | ● | ● | ● |
 | `SNMP` | ● | ● | ● | ● | ● | ● | ● |
-| `SFR` | ● | ● | ● | ● | ✕ | ● | ● |
-| `SFR_DUALPATH_RX` | ● | ● | ● | ● | ✕ | ● | ● |
-| `SFR_CWID` | ● | ● | ● | ● | ✕ | ● | ● |
+| `SFR` | ○ | ● | ● | ● | ✕ | ● | ● |
+| `SFR_DUALPATH_RX` | ○ | ● | ● | ● | ✕ | ● | ● |
+| `SFR_CWID` | ○ | ● | ● | ● | ✕ | ● | ● |
 | `TASK_STACKS` | ● | ● | ● | ● | ● | ● | ● |
 | `USB` | ✕ | ● | ✕ | ✕ | ● | ● | ● |
 | `HOSTLINK` | ● | ● | ● | ● | ● | ● | ● |
