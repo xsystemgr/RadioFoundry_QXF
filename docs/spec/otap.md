@@ -123,6 +123,14 @@ Over the debug link (`DL_CMD_OTAP`, [debuglink.md](debuglink.md) 3.23):
 - **Console**: the PC holds the secret and builds and signs the commands itself; the radio on USB only relays them
   (`otap send ...` and the replies). So the admin radio need not itself be provisioned to drive the fleet, and the
   secret on the PC is only ever used to sign — it is not stored on the radio in readable form.
+- **Group commands**: a command can be sent to a talkgroup instead of one radio (`SEND_GROUP`), so every fleet radio
+  on that talkgroup takes it in one unconfirmed transmission. Group data carries no acknowledgement and each radio
+  would otherwise answer at once, so a group command is **run but not answered**; confirm it with the counters (4) on
+  each radio, or by the effect. The retransmission (each message goes out a few times) covers a radio that missed the
+  first burst.
+- **Rekeying the fleet**: the bench GUI's "new privacy key" makes a fresh key, saves it on the connected (admin) radio
+  over USB (`LOCAL_KEY`, which writes the same setting the OTAR receive path does, so it persists), and sends it to the
+  others with `SET_KEY` — to one radio, or to a talkgroup for the whole fleet at once.
 
 The bench GUI (`rfoundry_bench_gui.py`, the "Στόλος (OTAP/OTAR)" tab) wraps both: a secret field with a "random"
 button, provisioning with the policy toggles (including the **key-change on/off** switch), and console buttons for

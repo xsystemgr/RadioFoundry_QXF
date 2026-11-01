@@ -24,6 +24,7 @@ static otap_request_t request;
 // One outbound datagram at a time (an answer, or a console command): built, then sent when the channel lets us
 static bool out_pending;
 static bool out_console;		// for the stats: a console send, not an answer
+static bool out_group;			// the pending send goes to a talkgroup (unconfirmed, no reply expected)
 static uint32_t out_dst, out_at, out_last;
 static uint8_t out_tries;
 static uint8_t out_msg[UDP_HEADER + OTAP_MSG_MAX];	// the UDP header is filled by the data service; we hold payload
@@ -91,7 +92,7 @@ void otap_rx(uint32_t src, bool group, uint32_t own_id, const uint8_t *payload, 
 
 	stats.rx++;
 	self_id = own_id;
-	if (group || !otapParse(payload, length, &m)) {
+	if (!otapParse(payload, length, &m)) {
 		stats.bad++;
 		return;
 	}
@@ -126,6 +127,7 @@ void otap_rx(uint32_t src, bool group, uint32_t own_id, const uint8_t *payload, 
 	// Accept it: advance the counter now (the radio core persists it), so a replay can't win even if the apply fails
 	cfg.counter = m.counter;
 	request.cmd = m.cmd;
+	request.group = group;	// a group command is run but not answered
 	request.counter = m.counter;
 	request.src = src;
 	request.len = m.len;
@@ -153,6 +155,9 @@ void otap_answer(const otap_request_t *req, uint8_t result, const uint8_t *data,
 	uint8_t body[1 + OTAP_STATUS_LEN];
 	uint8_t n;
 
+	if (req->group)
+		return;	// a group command is run on every radio at once; a reply from each would be a storm
+
 	if (len > OTAP_STATUS_LEN)
 		len = OTAP_STATUS_LEN;
 	body[0] = result;
@@ -166,13 +171,14 @@ void otap_answer(const otap_request_t *req, uint8_t result, const uint8_t *data,
 					     n, &out_msg[UDP_HEADER]);
 		out_dst = req->src;
 		out_console = false;
+		out_group = false;
 		out_at = 0;
 		out_pending = out_len > 0;
 	}
 	dmrDataServiceUnlock();
 }
 
-bool otap_console_send(uint32_t dst, const uint8_t *msg, int len)
+bool otap_console_send(uint32_t dst, bool group, const uint8_t *msg, int len)
 {
 	if (len <= 0 || len > OTAP_MSG_MAX || dst == 0 || dst > 0xFFFFFFu)
 		return false;
@@ -183,6 +189,7 @@ bool otap_console_send(uint32_t dst, const uint8_t *msg, int len)
 		out_len = (uint8_t)len;
 		out_dst = dst;
 		out_console = true;
+		out_group = group;
 		out_at = 0;
 		out_pending = true;
 		taken = true;
@@ -238,7 +245,7 @@ void otap_tick(uint32_t own_id, bool can_send, uint32_t now_ms)
 		return;
 	if ((out_last != 0) && ((now_ms - out_last) < OTAP_SEND_GAP_MS))
 		return;	// wait between tries, so the other radio can answer in the gap
-	if (dmrDataServiceSendUDP(false, out_dst, OTAP_PORT, OTAP_PORT, &out_msg[UDP_HEADER], out_len)) {
+	if (dmrDataServiceSendUDP(out_group, out_dst, OTAP_PORT, OTAP_PORT, &out_msg[UDP_HEADER], out_len)) {
 		out_last = now_ms ? now_ms : 1;
 		out_tries++;
 		if (out_tries >= OTAP_SEND_TRIES) {

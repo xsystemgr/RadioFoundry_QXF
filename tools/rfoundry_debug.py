@@ -94,7 +94,8 @@ RX2_FLAGS = {1: "present", 2: "up", 4: "bridge", 8: "restart"}
 SNMP = 0x19                         # the SNMP agent (CONFIG_SNMP; docs/spec/debuglink.md 3.17, docs/spec/snmp.md)
 SNMP_OP_SET, SNMP_OP_COMMUNITY, SNMP_OP_TEST_TRAP = range(3)
 OTAP = 0x1F                         # fleet administration (CONFIG_OTAP; docs/spec/debuglink.md 3.23, docs/spec/otap.md)
-OTAP_OP_INFO, OTAP_OP_SECRET, OTAP_OP_FLAGS, OTAP_OP_ADMIN, OTAP_OP_SEND, OTAP_OP_RECV, OTAP_OP_STATS = range(7)
+(OTAP_OP_INFO, OTAP_OP_SECRET, OTAP_OP_FLAGS, OTAP_OP_ADMIN, OTAP_OP_SEND, OTAP_OP_RECV, OTAP_OP_STATS,
+ OTAP_OP_SEND_GROUP, OTAP_OP_LOCAL_KEY) = range(9)
 OTAP_FLAG_SETTINGS, OTAP_FLAG_KEYS = 0x01, 0x02     # settings_t.otap_flags
 OTAP_PORT = 4101
 OTAP_VERSION = 1
@@ -1017,9 +1018,14 @@ class DebugLink:
     def otap_set_admin(self, index, dmr_id):
         self.otap_request(OTAP_OP_ADMIN, bytes([index & 1]) + int(dmr_id).to_bytes(3, "big"))
 
-    def otap_send(self, msg):
-        """Put a whole signed message (built by otap_build) on air to its target."""
-        self.otap_request(OTAP_OP_SEND, msg)
+    def otap_local_key(self, ptype, key, activate=True):
+        """Set and save THIS radio's privacy key over USB. ptype: 0 off / 1 Motorola / 2 Anytone."""
+        self.otap_request(OTAP_OP_LOCAL_KEY, struct.pack("<BHB", ptype & 0xFF, key & 0xFFFF, 1 if activate else 0))
+
+    def otap_send(self, msg, group=False):
+        """Put a whole signed message (built by otap_build) on air. group: its dst is a talkgroup, so every fleet
+        radio on it gets it in one unconfirmed transmission (no replies)."""
+        self.otap_request(OTAP_OP_SEND_GROUP if group else OTAP_OP_SEND, msg)
 
     def otap_recv(self):
         """The next reply heard for us: (src, message) or None."""

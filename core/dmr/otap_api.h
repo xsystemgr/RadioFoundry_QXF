@@ -51,6 +51,7 @@ typedef struct {
 // A request taken off the air, checked, for the radio core to run (SET_KEY: payload decrypted)
 typedef struct {
 	uint8_t cmd;
+	bool group;		// the command came as a group (talkgroup) call: run it but send no reply
 	uint32_t counter;
 	uint32_t src;
 	uint8_t len;
@@ -71,8 +72,9 @@ bool otap_take(otap_request_t *out);
 // The answer to it: a result and what follows (status: OTAP_STATUS_LEN octets, else none)
 void otap_answer(const otap_request_t *req, uint8_t result, const uint8_t *data, uint8_t len);
 
-// Any task (the debug link): a message already built and signed by the PC, to dst
-bool otap_console_send(uint32_t dst, const uint8_t *msg, int len);
+// Any task (the debug link): a message already built and signed by the PC, to dst (group: a talkgroup, so every
+// fleet radio on it gets it in one unconfirmed transmission; such a command is run but not answered)
+bool otap_console_send(uint32_t dst, bool group, const uint8_t *msg, int len);
 otap_send_state_t otap_console_state(void);
 // The next reply heard for us (0: none); the sender in *src
 int otap_console_recv(uint32_t *src, uint8_t out[OTAP_MSG_MAX]);

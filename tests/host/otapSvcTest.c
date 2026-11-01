@@ -142,8 +142,8 @@ int main(void)
 	otap_init();
 	uint8_t cmsg[OTAP_MSG_MAX];
 	int cn = otapBuild(&keys, OTAP_CMD_STATUS, 200, 0x555555, OUR_ID, NULL, 0, cmsg);
-	CHECK(otap_console_send(0x555555, cmsg, cn));
-	CHECK(!otap_console_send(0x555555, cmsg, cn));	// one at a time
+	CHECK(otap_console_send(0x555555, false, cmsg, cn));
+	CHECK(!otap_console_send(0x555555, false, cmsg, cn));	// one at a time
 	sent.valid = false;
 	run_tick();
 	CHECK(sent.valid && sent.dst == 0x555555);
@@ -165,5 +165,22 @@ int main(void)
 	send_ok = true;
 
 	printf("# otapSvcTest: %d checks, %d failures\n", checks, failures);
+	// A group command (talkgroup call) is run but never answered: no reply storm
+	otap_init();
+	ctr = 0;
+	provision(ADMIN_ID, 0, OTAP_ALLOW_SETTINGS);
+	{
+		uint8_t gpl[3] = { 0x00, 0x00, 0x08 };	// RX TG 8
+		uint8_t gmsg[OTAP_MSG_MAX];
+		int grn = otapBuild(&keys, OTAP_CMD_RX_TG, 300, 225001, ADMIN_ID, gpl, 3, gmsg);	// dst = a talkgroup
+		otap_rx(ADMIN_ID, true, OUR_ID, gmsg, grn);	// received as a group call
+		otap_request_t gr;
+		CHECK(otap_take(&gr) && gr.group && gr.cmd == OTAP_CMD_RX_TG);
+		sent.valid = false;
+		otap_answer(&gr, OTAP_R_OK, NULL, 0);
+		run_tick();
+		CHECK(!sent.valid);	// nothing goes out for a group command
+	}
+
 	return failures ? 1 : 0;
 }

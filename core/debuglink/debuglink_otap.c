@@ -12,6 +12,8 @@
 #include "dmr/otap_api.h"
 #include "settings/settings.h"
 #include "radio/radio.h"
+#include "dmr/dmrPrivacy.h"
+#include "hal_time.h"
 #include "crypto/sha256.h"	// crypto_wipe
 
 static uint32_t get24(const uint8_t *p) { return ((uint32_t)p[0] << 16) | ((uint32_t)p[1] << 8) | p[2]; }
@@ -79,11 +81,33 @@ size_t debuglink_cmd_otap(const uint8_t *req, uint16_t len, uint8_t *out, size_t
 		radio_req_reload();
 		out[0] = DL_ST_OK;
 		return 1;
-	case DL_OTAP_OP_SEND: {
-		// A whole signed message built by the PC; its destination is the target ID in the header (otap.h)
+	case DL_OTAP_OP_LOCAL_KEY: {
+		// Set and save this radio's own privacy key over USB (the same store the OTAR receive path writes), so the
+		// admin radio holds the same key it hands out
+		if (n != 4) { out[0] = DL_ST_BAD_ARG; return 1; }
+		uint8_t type = a[0];
+		uint16_t key = (uint16_t)(a[1] | (a[2] << 8));
+		if (type >= DMR_PRIVACY_NUM_TYPES || ((type != DMR_PRIVACY_OFF) && !dmrPrivacyKeyIsValid(type, key))) {
+			out[0] = DL_ST_BAD_ARG;
+			return 1;
+		}
+		settings_t *st = settings_begin();
+		st->privacy_type[0] = type;
+		st->privacy_key[0] = key;
+		settings_end(hal_millis());	// saved (debounced)
+		if (a[3])
+			radio_req_dmr_privacy(type, key);	// on now, too
+		out[0] = DL_ST_OK;
+		return 1;
+	}
+	case DL_OTAP_OP_SEND:
+	case DL_OTAP_OP_SEND_GROUP: {
+		// A whole signed message built by the PC; its destination (the target radio, or a talkgroup for the group
+		// op) is the header's dst (otap.h)
 		otapMsg_t m;
 		if (!otapParse(a, n, &m)) { out[0] = DL_ST_BAD_ARG; return 1; }
-		out[0] = otap_console_send(m.dst, a, n) ? DL_ST_OK : DL_ST_BUSY;
+		bool group = (req[0] == DL_OTAP_OP_SEND_GROUP);
+		out[0] = otap_console_send(m.dst, group, a, n) ? DL_ST_OK : DL_ST_BUSY;
 		return 1;
 	}
 	case DL_OTAP_OP_STATS: {

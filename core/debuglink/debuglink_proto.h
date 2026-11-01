@@ -46,6 +46,8 @@ enum {
 	DL_OTAP_OP_RECV,	// -> status, have u8; if 1: src u24, len u8, the reply message
 	DL_OTAP_OP_STATS,	// -> status, then 14 u32 counters (rx, bad, off, bad_tag, replay, not_admin, busy, done,
 				//    answers, answer_failed, console_rx, console_dropped, console_sent, console_failed)
+	DL_OTAP_OP_SEND_GROUP,	// a whole signed message (dst = a talkgroup): put on air to the group, no reply
+	DL_OTAP_OP_LOCAL_KEY,	// type u8, key u16 LE, activate u8: set THIS radio's privacy key, saved (not on air)
 };
 
 // DL_CMD_RX2 operations (first payload byte; docs/spec/debuglink.md 3.22). The token is u32 little endian

@@ -676,6 +676,9 @@ u24 big endian, as on the air.
 | 3 | ADMIN | index u8 (0/1), id u24 | an admin DMR ID allowed to command this radio (0 = unused) |
 | 4 | SEND | a whole signed message (otap.md 3) | relays it on the air to the target ID in its header |
 | 5 | RECV | none | have u8; if 1: src u24, len u8, then the reply message waiting for us |
+| 6 | STATS | none | 14 u32 counters (rx, bad, off, bad_tag, replay, not_admin, busy, done, answers, answer_failed, console_rx, console_dropped, console_sent, console_failed) |
+| 7 | SEND_GROUP | a whole signed message (dst = a talkgroup) | relays it to the group in one unconfirmed transmission; no reply is expected |
+| 8 | LOCAL_KEY | type u8, key u16, activate u8 | sets and saves this radio's own privacy key (not on air), so the admin holds the key it hands out |
 
 SECRET, FLAGS and ADMIN provision this radio (they write the settings and the radio core re-reads them). SEND and
 RECV are the PC console: the PC holds the secret and builds and checks the messages, the radio only relays. The secret
