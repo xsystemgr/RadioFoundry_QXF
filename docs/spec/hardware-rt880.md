@@ -3,7 +3,7 @@
 
 # Radtel RT-880: port investigation
 
-Status: private UI bring-up. An experimental standalone target builds; no physical test has run.
+Status: private FM receive experiment. An RX-capable standalone target builds and passes modeled tests; no physical test has run.
 The first target is analog FM receive. Digital voice is a separate feasibility question.
 The owner's exact model suffix and PCB revision still need confirmation.
 
@@ -157,9 +157,9 @@ A full 240 by 320 RGB565 frame needs 153,600 bytes. A 4-bit indexed frame needs
 Choose a measured display geometry/scale and feature profile after a linker map exists.
 Do not claim the default configuration of an existing board fits this MCU.
 
-A private UI-only board implementation now builds through
+A private FM receive board implementation now builds through
 `make -f boards/rt880/Makefile image` (run from the repository root). It uses the
-existing RadioFoundry core and a new platform/HAL; it is not a functioning receiver.
+existing RadioFoundry core and a new platform/HAL; its physical reception has not been verified.
 The owner explicitly waived clean-room role separation for this closed experiment
 on November 1, 2026. No reference firmware code or initialization tables were imported.
 The remaining hardware blockers are external PA/power control, MCU verification,
@@ -241,7 +241,7 @@ implemented platform. It does not complete board glue, the PA safe-off state,
 display adaptation, calibration protection or loader/recovery validation.
 
 
-## Private UI target result
+## Private UI checkpoint (before receive integration)
 
 The standalone target is intentionally absent from release and flashing registries.
 The first linked image allocates 91,852 bytes in flash and 44,456 bytes in SRAM,
@@ -261,3 +261,47 @@ model reached kernel task handoff and startup housekeeping with 1,608 bytes of R
 heap free. Delays and pixel bursts were bypassed in that model. It does not prove
 hardware compatibility, safe RF state, live interrupt/context switching or runtime
 peak memory. No connected hardware was flashed or tested.
+
+
+## Private FM receive target
+
+The owner's unit currently runs nicFW 5.14.x (owner confirmation). An independent
+report by the nicFW author identifies the RT-880 MCU as AT32F423, strengthening
+that platform choice. The same author's schematic-based explanation says the
+second BK4819 has no receive input path; it serves crossband transmission. This
+is a different topology from a two-chip superheterodyne receiver. No public
+schematic was obtained for the owner's exact PCB.
+
+- [Author's MCU comparison](https://www.patreon.com/nicsure/posts/rt-950-pro-vs-rt-153711437)
+- [Author's RF-path explanation](https://www.patreon.com/nicsure/posts/rt-880-is-very-133417003)
+
+Further isolated basic-block observations confirm PF8 high plus PC4 low when
+audio is opened, PC4 high at mute, and PF8 low in speaker shutdown. They establish
+software-selected levels; physical amplifier function and isolation still need
+measurement. VHF/UHF receive routing remains RF B register 0x33 = 0x10/0x20,
+with RF B enables and PA level held at zero. MCU PF0 and PC15 remain low in this
+restricted receive profile; no HF path is attempted.
+
+The new HAL uses the existing RadioFoundry BK4819 register/bus, analog-mode,
+bandwidth, tuning, AF and RSSI helpers. Its new receive-only initialization entry
+point avoids the ordinary initialization's nonzero GPIO pulse. Both chip IDs
+must match 0x4819, then RF A receives at 136-174 or 400-480 MHz FM. The existing
+core supplies squelch and channel behavior. TX, sub-audio requests and storage
+writes are refused. A held raw matrix position 4 supplies monitor; printed key
+legends remain unidentified.
+
+All six task-stack checks and host tests pass. A CPU/pin model runs startup and
+60 core radio-task iterations, tunes 145.500 MHz, opens audio on modeled carrier
+and closes it on loss, with no TX state, nonzero PA level or NOR select. This is
+implementation/model evidence, not measured RF reception. The implementation,
+restrictions and test entry points are in the
+[experimental target](../../boards/rt880/README.md).
+
+
+Artery's [ES0010 errata](https://arterytek.com/file/download/2228) describes PC13
+remaining high-impedance after slow power-on. This pin is the display D/C line.
+The platform now requests a software reset when the POR flag is set and the
+software-reset flag is clear, before peripheral startup. It does not clear those
+flags itself. The host test covers all four flag combinations, and the CPU model
+covers one requested reset followed by a successful kernel handoff. Bootloader
+execution and its reset-flag handling remain outside that model.

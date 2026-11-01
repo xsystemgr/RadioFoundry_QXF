@@ -186,6 +186,28 @@ void bk4819_init_main(bk4819_t *dev)
 	dev->freq_10hz = 0;
 }
 
+void bk4819_init_rx_only(bk4819_t *dev)
+{
+	const bk4819_bus_t *b = dev->bus;
+	b->cs(true);
+	b->clk(false);
+	bk4819_write(dev, BK4819_REG_ID, 0x8000);
+	bk4819_write(dev, BK4819_REG_ID, 0);
+	bk4819_write(dev, BK4819_REG_PA, 0);
+	bk4819_write(dev, 0x33, 0);
+	if (b->delay_ms != NULL) b->delay_ms(RESET_MS);
+	// The ordinary main initialization briefly sets GPIO outputs. A board may
+	// wire those to RF stages, so receiver-only startup must never assert them.
+	for (size_t i = 0; i < sizeof(init_common) / sizeof(init_common[0]); i++) {
+		if (init_common[i].reg != 0x33) {
+			bk4819_write(dev, init_common[i].reg, init_common[i].val);
+		}
+	}
+	write_table(dev, init_main_tail, sizeof(init_main_tail) / sizeof(init_main_tail[0]));
+	dev->idle = BK4819_STATE_IDLE_MAIN;
+	dev->freq_10hz = 0;
+}
+
 void bk4819_init_lo(bk4819_t *dev, uint16_t pa)
 {
 	reset(dev);

@@ -561,11 +561,28 @@ static void test_dmr_tx(void)
 	CHECK(chips[0].protocol_errors == 0 && chips[1].protocol_errors == 0);
 }
 
+static void test_receive_only_init(void)
+{
+	bk4819_t dev;
+	reset_chips();
+	bk4819_attach(&dev, &bus_main);
+	bk4819_init_rx_only(&dev);
+	CHECK(dev.state == BK4819_STATE_IDLE_MAIN);
+	for (int i = 0; i < chips[0].n; i++) {
+		frame_t f = chips[0].log[i];
+		if (f.reg == 0x33 || f.reg == 0x36) CHECK(f.val == 0);
+		if (f.reg == 0x30) CHECK((f.val & 0x4000u) == 0);
+	}
+	CHECK(chips[0].regs[0x36] == 0);
+	CHECK(chips[0].protocol_errors == 0 && crit_depth == 0);
+}
+
 int main(void)
 {
 	test_helpers();
 	test_frames();
 	test_init();
+	test_receive_only_init();
 	test_sequences();
 	test_dmr_rx();
 	test_dmr_tx();

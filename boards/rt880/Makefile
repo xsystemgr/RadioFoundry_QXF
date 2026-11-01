@@ -4,7 +4,7 @@
 # Run from the repository root: make -f boards/rt880/Makefile
 .DEFAULT_GOAL := all
 BUILD := build/rt880-lab
-TARGET := $(BUILD)/rfoundry_rt880_ui_UNTESTED
+TARGET := $(BUILD)/rfoundry_rt880_rx_UNTESTED
 ARM_GCC_DIR ?= $(firstword $(wildcard $(HOME)/opt/arm-gnu-toolchain-*-arm-none-eabi/bin/) /usr/bin/)
 CROSS ?= $(ARM_GCC_DIR)arm-none-eabi-
 CC := $(CROSS)gcc
@@ -13,7 +13,7 @@ $(foreach f,$(FEATURE_NAMES),$(eval CONFIG_$(f) := n))
 $(foreach f,FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN KEY_ASSIGN CHANNEL_LIST,$(eval CONFIG_$(f) := y))
 include config/features.mk
 DIRS := core/app core/radio core/ui core/input core/codeplug core/settings core/storage \
-	platform/at32f423 boards/rt880 drivers/display/st7789
+	platform/at32f423 boards/rt880 drivers/display/st7789 drivers/rf/bk4819 drivers/rf/subaudio
 SRC := $(foreach d,$(DIRS),$(wildcard $(d)/*.c))
 SRC := $(filter-out core/app/task_stack.c core/app/watchdog.c,$(SRC))
 RTOS := third_party/FreeRTOS-Kernel
@@ -45,8 +45,11 @@ image: $(TARGET).elf
 test:
 	@mkdir -p $(BUILD)
 	cc -std=c11 -Wall -Wextra -Werror -Ihal -Icore -Idrivers -Iplatform/at32f423 \
-		boards/rt880/board.c drivers/display/st7789/st7789.c boards/rt880/tests/board_test.c -o $(BUILD)/board-test
+		boards/rt880/board.c boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c drivers/display/st7789/st7789.c boards/rt880/tests/board_test.c -o $(BUILD)/board-test
 	$(BUILD)/board-test
+	cc -std=c11 -Wall -Wextra -Werror -Ihal -Icore -Idrivers -Iplatform/at32f423 \
+		boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c boards/rt880/tests/radio_test.c -o $(BUILD)/radio-test
+	$(BUILD)/radio-test
 stack-check: $(TARGET).elf
 	python3 tools/stack_check.py --build $(BUILD) --label rt880-lab --cc '$(CC)' \
 		--cflags '$(CFLAGS)' --elf $(TARGET).elf --overhead 208

@@ -2,6 +2,7 @@
 // Copyright (c) 2026 The RadioFoundry Authors
 // Conservative HICK 8 MHz bring-up; no PLL, flash programming or RF driver.
 #include "platform.h"
+#include "reset_policy.h"
 #include "board.h"
 #include "hal_time.h"
 #include "FreeRTOS.h"
@@ -91,6 +92,13 @@ void vApplicationTickHook(void) { (void)cycles(); }
 void SysTick_Handler(void) { xPortSysTickHandler(); }
 int main(void)
 {
+	if (at32_pc13_needs_reset(REG(0x40023874u))) {
+		board_rf_safe();
+		__asm volatile("dsb" ::: "memory");
+		REG(0xE000ED0Cu) = 0x05FA0004u | (REG(0xE000ED0Cu) & 0x700u);
+		__asm volatile("dsb" ::: "memory");
+		for (;;) {}
+	}
 	setup();
 	board_rf_safe();
 	board_early_init();

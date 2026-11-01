@@ -3,7 +3,7 @@
 
 # RT-880 bring-up plan
 
-Status: private UI bring-up target builds. No hardware test has been run.
+Status: private FM receive target builds and passes model tests. No hardware test has been run.
 The input facts and unknowns are in [Hardware investigation](../spec/hardware-rt880.md).
 Follow [Adding a radio](../dev/adding-a-radio.md). The owner explicitly waived the
 [clean-room role separation](../CLEANROOM.md) for the closed experiment on November 1, 2026.
@@ -60,7 +60,7 @@ No flashing or radio transmission is authorized by this document. Hardware opera
 the owner's specific test request and the repository's opt-in HIL procedure.
 
 
-## Private build checkpoint
+## Private UI build checkpoint (before receive integration)
 
 An experimental standalone build now exists at
 [boards/rt880](../../boards/rt880/README.md). It reuses the existing RadioFoundry
@@ -70,3 +70,26 @@ storage rejection, keypad scanning and the serial display contract. Link usage i
 91,852 bytes flash and 44,456 bytes SRAM. The candidate device and memory map still
 need independent physical confirmation. A CPU startup model is not completion of
 steps 1-7 above; there has been no physical boot or receive test.
+
+
+## Private receive checkpoint
+
+The standalone target now implements FM RX with the existing BK4819 driver and
+RadioFoundry core squelch. Host tests check both pin buses, ID refusal, VHF/UHF
+routing, tuning/status/audio, TX/PA restrictions and bounded fault shutdown. A CPU
+model runs 60 core radio-task iterations and opens/closes the speaker for modeled
+carrier/loss. No real signal has been received on a physical unit during this work.
+
+The owner confirms nicFW 5.14.x is running now. Before replacement, retain a full
+RMS external-storage backup and the exact working nicFW application. Verify the
+PTT-at-power-on loader entry without sending write commands and retain the same
+model profile that previously installed working nicFW; do not select a profile
+solely by interpreting the serial suffix. Storage backup restoration requires
+reinstalling working nicFW first, because this lab target has no RMS link.
+
+The first physical test must record boot/display, both RF IDs, default-channel
+tuning, noise/RSSI and actual audio with a known signal, plus a monitor/noise test
+and signal-loss squelch closure. Observe unexpected current or heating and power
+off if seen. The image still has no transmit implementation; no RF transmit test
+is part of this checkpoint. Do not change this record to hardware-tested until
+those observations actually exist.

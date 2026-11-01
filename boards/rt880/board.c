@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "board.h"
+#include "radio.h"
 #include "platform.h"
 #include "hal_time.h"
 #include "display/st7789/st7789.h"
@@ -11,12 +12,7 @@
 static void nothing(void) {}
 static void ignore_bool(bool on) { (void)on; }
 
-// Deassert both observed RF selects. This does not identify or disable an external PA.
-void board_rf_safe(void)
-{
-	at32_pin_output(AT32_GPIO_C, 7, true);
-	at32_pin_output(AT32_GPIO_A, 8, true);
-}
+void board_rf_safe(void) { rt880_rf_halt(); }
 void board_early_init(void)
 {
 	board_rf_safe();
@@ -115,27 +111,22 @@ static const hal_input_t input = { .init = input_init, .scan = input_scan, .enco
 static const keymap_entry_t keys[] = {
 	{ .bit = 0, .short_action = ACT_NAV_UP, .repeat = true },
 	{ .bit = 1, .short_action = ACT_NAV_DOWN, .repeat = true },
-	{ .bit = 2, .short_action = ACT_SELECT },
+	{ .bit = 2, .short_action = ACT_SELECT, .long_action = ACT_SELECT },
 	{ .bit = 3, .short_action = ACT_BACK },
+	{ .bit = 4, .short_action = ACT_MONITOR, .raw_edges = true },
+	{ .bit = 5, .short_action = ACT_VFO_TOGGLE },
+	{ .bit = 6, .short_action = ACT_DIGIT_0 },
+	{ .bit = 7, .short_action = ACT_DIGIT_1 },
+	{ .bit = 8, .short_action = ACT_DIGIT_2 },
+	{ .bit = 9, .short_action = ACT_DIGIT_3 },
+	{ .bit = 10, .short_action = ACT_DIGIT_4 },
+	{ .bit = 11, .short_action = ACT_DIGIT_5 },
+	{ .bit = 12, .short_action = ACT_DIGIT_6 },
+	{ .bit = 13, .short_action = ACT_DIGIT_7 },
+	{ .bit = 14, .short_action = ACT_DIGIT_8 },
+	{ .bit = 15, .short_action = ACT_DIGIT_9 },
 };
 
-static void set_mode(radio_mode_t mode) { (void)mode; }
-static bool receive(uint32_t hz, radio_bw_t bw, const subtone_t *tone)
-{
-	(void)hz; (void)bw; (void)tone; return false;
-}
-static bool transmit(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
-{
-	(void)hz; (void)bw; (void)power; (void)tone; return false;
-}
-static void status(radio_status_t *value)
-{
-	*value = (radio_status_t){ .rssi_dbm = -127, .noise = 255 };
-}
-static const hal_radio_t radio = {
-	.init = nothing, .set_mode = set_mode, .rx = receive, .tx = transmit,
-	.tx_off = nothing, .status = status, .audio = ignore_bool,
-};
 static bool flash_init(void) { return false; }
 static bool flash_read(uint32_t address, void *buf, uint32_t len)
 {
@@ -161,19 +152,19 @@ static const hal_power_t power = {
 static bool diag(uint8_t line, char *buf, uint8_t len)
 {
 	switch (line) {
-	case 0: snprintf(buf, len, "UI ONLY - RF DISABLED"); break;
+	case 0: snprintf(buf, len, "RX EXPERIMENT / NO TX"); break;
 	case 1: snprintf(buf, len, "Keys: %04lX", (unsigned long)last_keys); break;
 	case 2: snprintf(buf, len, "No storage writes"); break;
 	case 3: snprintf(buf, len, "MCU/PA not verified"); break;
-	default: return false;
+	default: return rt880_rf_diag((uint8_t)(line - 4), buf, len);
 	}
 	return true;
 }
 static const band_t bands[] = { { 136000000, 174000000, false }, { 400000000, 480000000, false } };
 static const char *const power_names[] = { "OFF" };
 const board_t board = {
-	.name = "RT-880 LAB NO RF", .caps = CAP_KEYPAD,
+	.name = "RT-880 RX LAB", .caps = CAP_KEYPAD,
 	.bands = bands, .band_count = 2, .power_count = 1, .power_names = power_names,
-	.display = &display, .input = &input, .keymap = keys, .keymap_len = 4,
-	.radio = &radio, .power = &power, .flash = &flash, .diag_line = diag,
+	.display = &display, .input = &input, .keymap = keys, .keymap_len = sizeof(keys) / sizeof(keys[0]),
+	.radio = &rt880_radio, .power = &power, .flash = &flash, .diag_line = diag,
 };

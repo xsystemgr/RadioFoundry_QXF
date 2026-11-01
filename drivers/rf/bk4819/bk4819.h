@@ -154,6 +154,9 @@ uint16_t bk4819_read(bk4819_t *dev, uint8_t reg);
 
 // Main chip: soft reset and the power-on table; ends idle with the audio muted. Task level
 void bk4819_init_main(bk4819_t *dev);
+// Receive-only initialization: keeps GPIO outputs and PA level zero throughout,
+// including the first power-on table. Ends idle and muted; never enters a TX state.
+void bk4819_init_rx_only(bk4819_t *dev);
 // LO chip: soft reset, the power-on table and synthesizer set-up with output level pa (0x36); ends off
 void bk4819_init_lo(bk4819_t *dev, uint16_t pa);
 // Analog mode set of the main chip, as the stock firmware on entering an analog channel: 0x2A, AFC on (0x73 bit 4

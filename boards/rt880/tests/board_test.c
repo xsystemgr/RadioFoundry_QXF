@@ -13,6 +13,9 @@ static bool pins[6][16];
 static unsigned serial_bits, command_count, data_count, pixel_count;
 static uint8_t serial_byte, last_command, first_pixel, last_data;
 void at32_pin_output(uint32_t port, unsigned pin, bool level) { at32_pin_write(port, pin, level); }
+uint32_t at32_irq_save(void) { return 0; }
+void at32_irq_restore(uint32_t state) { (void)state; }
+void at32_pin_input_floating(uint32_t port, unsigned pin) { (void)port; (void)pin; }
 void at32_pin_input(uint32_t port, unsigned pin) { (void)port; (void)pin; }
 void at32_pin_write(uint32_t port, unsigned pin, bool level)
 {
@@ -52,10 +55,15 @@ int main(void)
 	}
 	assert(writes == 0);
 	for (unsigned i = 0; i < board.band_count; i++) assert(!board.bands[i].tx);
+	unsigned digits = 0;
 	for (unsigned i = 0; i < board.keymap_len; i++) {
 		assert(board.keymap[i].short_action != ACT_PTT);
 		assert(board.keymap[i].long_action != ACT_PTT);
+		unsigned action = board.keymap[i].short_action;
+		if (action >= ACT_DIGIT_0 && action <= ACT_DIGIT_9) digits |= 1u << (action - ACT_DIGIT_0);
 	}
+	assert(digits == 0x3FFu);
+	assert(board.keymap[5].short_action == ACT_VFO_TOGGLE);
 	assert(!board.flash->init());
 	assert(!board.flash->write(0, "x", 1));
 	assert(!board.flash->erase(0));
