@@ -117,3 +117,46 @@ Five emulator checks reconstructed the expected output bytes for both RF paths, 
 and display command/data. This does not verify clock timing, slave responses or electrical levels.
 PTT, power latch, PA control, RF switching, audio routing and calibration boundaries remain open.
 These observations narrow the investigation; they do not authorize a flash image or transmitter bring-up.
+
+
+## Input and clock observations
+
+The keypad is a 4 by 4 matrix. Drive outputs PB10, PB2, PB1 and PB0 in that order;
+read inputs PC10, PC11, PC12 and PD2. An asserted input is high while the selected
+output is high. Return all driven outputs low between scans. Sixteen synthetic
+single-key positions plus idle were checked in an isolated CPU emulator. The physical
+legends and the new RadioFoundry action map have not been established.
+
+PB6 is an active-low request input, strongly identified as PTT by its use in the
+transmit-state path. A separate remote request can also assert the request. All four
+physical/remote combinations were checked in emulation. This does not establish whether
+the programming cable can influence the input.
+
+Additional keys use ADC channel argument 12. Stable sample bands were observed at
+1125-1659, 1660-2771 and 2772-3499 counts, with no key below 1125 or at/above 3500.
+Ten boundary cases were checked. The physical ADC pin and key labels remain unconfirmed.
+
+PA9 controls display backlight/enable alongside display sleep/on commands. PC4 and PF8
+change in audio/tone/squelch paths; their external circuitry is unconfirmed. Do not label
+these pins as PA control merely because they change during radio operation.
+
+The reference clock setup computes SYSCLK/AHB/APB2 at 150 MHz and APB1 at 75 MHz
+in an emulator whose ready bits follow enables and source status follows selection.
+These are software-computed clocks, not hardware measurements or a copied startup recipe.
+
+## RadioFoundry implementation boundary
+
+Use the existing core and HAL, a new platform and board glue, and existing chip drivers
+where their documented hardware matches. In particular, the existing display driver has
+command/data/pixel bus callbacks; a serial GPIO backend does not require replacing the UI.
+The existing key matrix decoder can consume normalized asserted-column bits.
+
+A full 240 by 320 RGB565 frame needs 153,600 bytes. A 4-bit indexed frame needs
+38,400 bytes and leaves only 10,752 bytes of a 48 KiB SRAM for all other runtime use.
+Choose a measured display geometry/scale and feature profile after a linker map exists.
+Do not claim the default configuration of an existing board fits this MCU.
+
+No actual board implementation, ELF or flashable RadioFoundry image exists yet. The
+remaining hardware blockers are external PA/power control, storage protection and a
+verified loader/recovery route. This specification is the input for independent
+implementation under the repository's clean-room role separation.
