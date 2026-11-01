@@ -203,7 +203,11 @@ void bk4819_init_rx_only(bk4819_t *dev)
 			bk4819_write(dev, init_common[i].reg, init_common[i].val);
 		}
 	}
-	write_table(dev, init_main_tail, sizeof(init_main_tail) / sizeof(init_main_tail[0]));
+	for (size_t i = 0; i < sizeof(init_main_tail) / sizeof(init_main_tail[0]); i++) {
+		// Main startup includes 0302 (TX DSP bit 1), unnecessary for RX-only.
+		if (init_main_tail[i].reg == BK4819_REG_ENABLES && (init_main_tail[i].val & 0x000Eu)) continue;
+		bk4819_write(dev, init_main_tail[i].reg, init_main_tail[i].val);
+	}
 	dev->idle = BK4819_STATE_IDLE_MAIN;
 	dev->freq_10hz = 0;
 }
