@@ -191,7 +191,7 @@ benefit comes from CPU throughput, not an assumed panel refresh setting.
 A software volume hook now drives the existing BK4819 AF DAC gain helper;
 50 percent is the initial level (0x48 = 0xB3B8 rather than 0xB3B3). Zero closes
 AF and the speaker gate; restoring volume preserves the core's audio request.
-This is the core's Volume control; the physical knob ADC is still absent.
+This is the core's Volume control; physical knob wiring is unverified.
 It is a gain/control improvement, not a confirmed explanation for the silence.
 
 Diagnostics now show CPU MHz, last AF/AF-gain register readbacks, Audio OPEN or
@@ -221,3 +221,39 @@ Arrow long actions now match their short actions so held navigation repeats.
 The native board test drives every pin position through the actual input
 engine and checks all 16 short actions, arrow repeats, long * and long Back.
 No ADC side-key or PTT binding is added. Access Monitor from Quick settings.
+
+## Owner confirms keys; audio remains silent at squelch zero
+
+The owner confirms the fix4 physical keys work. Speaker silence persists with
+squelch disabled. An isolated run of the reference receive path confirms AF
+0x6140, receiver enables 0xBFF1 and the previously observed PF8-high/PC4-low
+audio-open command. The port already requests those values.
+
+The reference DAC Gain setting controls both Gain2 (0x48 bits 9:4) and DAC gain
+(bits 3:0); observed settings 0/7/15 produce B010/B1E7/B3FF. The port's software
+volume currently changes only the DAC gain over B3B0. Thus software Volume is
+not the same control curve as the reference DAC Gain setting. This difference
+alone does not establish the cause of complete silence.
+
+Only direct calls to the identified ADC reader for side keys (channel 12) and
+battery scaling (channel 7) were found. The earlier suggestion of an ADC-backed
+volume knob was not established. Analog potentiometer wiring is plausible,
+but cannot be proved from the image; a schematic or measurement is needed.
+
+Other observed differences include receiver power 0x37 = 1F0F in the reference
+versus 1D0F in the port (RF LDO voltage bit), and default AF filters 0x2B = 0000
+versus C000. The shared chip driver's profile originated on another board.
+These are investigation leads, not permission to copy its initialization table
+or assert that either difference explains silence. No new binary is issued for
+this documentation checkpoint.
+
+Next hardware evidence: with squelch zero, software Volume 100 and the physical
+knob at a moderate position, record both RF IDs, AF/gain readbacks and commanded
+Audio OPEN/MUTE. At software Volume 100 the current expected gain is B3BF;
+AF is 6140 when open. If these do not match, investigate bus/state handling.
+If they match and there is no noise, investigate the analog AF/speaker path and
+remaining device-specific receiver setup. The radio is not physically attached
+to the development environment.
+
+Register meanings: [Beken register list](https://alfaexploit.com/files/BK4819V3Registers_List_20201218.pdf),
+registers 0x30, 0x37, 0x47 and 0x48.

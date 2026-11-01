@@ -157,3 +157,20 @@ selects, orange Exit backs out, * opens Quick (held: lock) and # V/M toggles
 VFO/channel. Monitor is available in Quick instead of on a digit key. The
 actual input-engine host test checks every physical scan bit and held gestures.
 The radio core, fix3 clock/audio path and RX-only restrictions are unchanged.
+
+## Keys verified; silent audio investigation
+
+The owner confirms fix4 keys work, but reports silence even with squelch off.
+Isolated reference RX runs confirm AF 6140, receiver state BFF1, and DAC Gain
+settings 0/7/15 -> B010/B1E7/B3FF. The previous PF8-high/PC4-low opening
+observation remains valid. The current port requests the same AF/state/gates;
+its volume changes only the 0x48 DAC nibble, not the full reference gain curve.
+
+Direct ADC-reader calls identified so far are channel 12 (side keys) and 7
+(battery). An ADC-backed physical volume knob has not been established; prior
+wording suggesting one was premature. Analog knob wiring remains an inference.
+Reference RX power 1F0F and filters 0000 differ from this port's 1D0F/C000, but
+neither difference is a proven cause of silence. Physical IDs/AF/gain/audio
+readbacks are required before attributing the fault to the external analog
+path or another receiver setup field. No firmware change is made at this
+checkpoint; the working keymap and current binary remain unchanged.
