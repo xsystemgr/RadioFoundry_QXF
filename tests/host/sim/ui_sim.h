@@ -25,7 +25,7 @@ typedef enum { SIM_MAP_K, SIM_MAP_M, SIM_MAP_V, SIM_MAP_F, SIM_MAP_COUNT } sim_m
 
 extern const sim_geom_t sim_geoms[];
 extern const int sim_geom_count;
-// Also "WxH", "WxHiN" (inset N all round), "WxHiNxM" (N left and right, M top and bottom), "WxHm" (mono)
+// Also "WxHp" (4-bit indexed), "WxH", "WxHiN" (inset N all round), "WxHiNxM" (N left and right, M top and bottom), "WxHm" (mono)
 const sim_geom_t *sim_geom_find(const char *name);
 
 // Start over: the radio on zone 0 channel 1 (DMR), no calls heard, an empty inbox, Home

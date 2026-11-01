@@ -29,7 +29,7 @@ void at32_pin_output(uint32_t port, unsigned pin, bool level)
 	clock_on(port);
 	at32_pin_write(port, pin, level);
 	REG(port + 0x04u) &= ~(1u << pin); // push-pull
-	REG(port + 0x08u) &= ~(3u << (pin * 2)); // lowest drive strength
+	REG(port + 0x08u) &= ~(3u << (pin * 2)); // normal drive strength
 	REG(port + 0x0Cu) &= ~(3u << (pin * 2)); // no pull
 	REG(port) = (REG(port) & ~(3u << (pin * 2))) | (1u << (pin * 2));
 	at32_irq_restore(state);

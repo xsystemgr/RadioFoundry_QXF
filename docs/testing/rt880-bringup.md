@@ -3,7 +3,7 @@
 
 # RT-880 bring-up plan
 
-Status: private FM receive target builds and passes model tests. No hardware test has been run.
+Status: the owner confirms the first RX target boots and displays a slow landscape UI. RX/audio remains unverified; a portrait correction is prepared.
 The input facts and unknowns are in [Hardware investigation](../spec/hardware-rt880.md).
 Follow [Adding a radio](../dev/adding-a-radio.md). The owner explicitly waived the
 [clean-room role separation](../CLEANROOM.md) for the closed experiment on November 1, 2026.
@@ -93,3 +93,18 @@ and signal-loss squelch closure. Observe unexpected current or heating and power
 off if seen. The image still has no transmit implementation; no RF transmit test
 is part of this checkpoint. Do not change this record to hardware-tested until
 those observations actually exist.
+
+
+## Owner report: first boot succeeds, display slow and horizontal
+
+The owner confirmed the originally reported black screen was followed by a
+working UI. The device was initially observed for only a few seconds. The loader
+is still accessible. This establishes basic boot/display operation for that
+binary; it does not establish reception or the correctness of every HAL path.
+
+The new portrait image removes per-bit LCD waits, enables the display control
+before initialization and uses the reference image's orientation command.
+It requires a fresh physical check of orientation and responsiveness, then the
+previous RF ID/Monitor/known-signal checks. The UI simulator previews are sample
+screens, not pictures of a verified hardware run. The temporary bare-metal probe
+was discarded once the owner confirmed boot; it is not a deliverable.

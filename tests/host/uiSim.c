@@ -2,7 +2,7 @@
 // Copyright (c) 2026 The RadioFoundry Authors
 // The UI host simulator's command line (docs/spec/ui.md 7):
 //
-//   uiSim [--geom 160x120i5|160x128|128x64|240x320|WxH[iN|m]] [--map K|M|V|F] [--scale N] [--out FILE.png]
+//   uiSim [--geom 160x120i5|160x128|128x64|240x320|WxH[iN|m|p]] [--map K|M|V|F] [--scale N] [--out FILE.png]
 //         [--script "ok 4 down ok expect:zone=1"]
 //   uiSim --gallery DIR      every screen at every display class: DIR/<geom>/<screen>.png, plus the contact sheets
 //                            in DIR/sheets. A color page is drawn again in each highlight color UI_GALLERY_COLORS

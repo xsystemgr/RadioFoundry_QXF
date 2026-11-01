@@ -26,9 +26,9 @@ static void lcd_byte(uint8_t value)
 	for (unsigned bit = 0; bit < 8; bit++) {
 		at32_pin_write(AT32_GPIO_B, 3, false);
 		at32_pin_write(AT32_GPIO_B, 5, (value & 0x80u) != 0);
-		hal_delay_us(1);
+		// At this target's fixed 8 MHz, the GPIO stores and loop instructions
+		// already exceed the panel's serial clock minimum periods.
 		at32_pin_write(AT32_GPIO_B, 3, true);
-		hal_delay_us(1);
 		value <<= 1;
 	}
 }
@@ -58,12 +58,14 @@ static const st7789_bus_t bus = {
 	.begin = lcd_begin, .end = lcd_end, .cmd = lcd_cmd, .data = lcd_data,
 	.pixels = lcd_pixels, .reset = lcd_reset, .delay_ms = hal_delay_ms,
 };
-// Reuse the existing 160x120 UI geometry: landscape, doubled to 320x240.
+// Portrait UI, 120x160 indexed pixels doubled to the native 240x320 panel.
 static const st7789_t panel = {
-	.bus = &bus, .width = 320, .height = 240, .madctl = 0x60, .scale = 2,
+	.bus = &bus, .width = 240, .height = 320, .madctl = 0x20, .scale = 2,
 };
 static void display_init(void)
 {
+	// Enable before reset/commands: the pin's role may include panel power.
+	at32_pin_output(AT32_GPIO_A, 9, true);
 	at32_pin_output(AT32_GPIO_A, 15, true);
 	at32_pin_output(AT32_GPIO_B, 3, true);
 	at32_pin_output(AT32_GPIO_B, 5, false);
@@ -77,7 +79,7 @@ static void display_flush(const void *fb, const uint16_t *palette, uint16_t y0, 
 }
 static void backlight(uint8_t percent) { at32_pin_write(AT32_GPIO_A, 9, percent != 0); }
 static const hal_display_t display = {
-	.width = 160, .height = 120, .bpp = 4, .init = display_init,
+	.width = 120, .height = 160, .bpp = 4, .init = display_init,
 	.flush_indexed = display_flush, .set_backlight = backlight,
 };
 

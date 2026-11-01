@@ -3,7 +3,7 @@
 
 # Radtel RT-880: port investigation
 
-Status: private FM receive experiment. An RX-capable standalone target builds and passes modeled tests; no physical test has run.
+Status: private FM receive experiment. The owner confirms UI boot with slow landscape drawing. Physical RX is not verified; a faster portrait build is prepared.
 The first target is analog FM receive. Digital voice is a separate feasibility question.
 The owner's exact model suffix and PCB revision still need confirmation.
 
@@ -305,3 +305,18 @@ software-reset flag is clear, before peripheral startup. It does not clear those
 flags itself. The host test covers all four flag combinations, and the CPU model
 covers one requested reset followed by a successful kernel handoff. Bootloader
 execution and its reset-flag handling remain outside that model.
+
+
+## Owner boot report and portrait correction
+
+The owner first reported a black screen after flashing, then confirmed the RX
+image boots and displays the UI after waiting. The report is slow drawing and
+landscape orientation, not an established startup crash. The loader remains
+accessible. RF IDs, audible reception and squelch behavior were not reported.
+
+The new lab build uses a 120 by 160 indexed frame, 240 by 320 physical pixels at
+2x scale, and MADCTL 0x20 as observed in the reference image. Pixel storage stays
+9,600 bytes; row metadata grows by 160 bytes. The two per-bit DWT waits in the
+LCD sender are removed at the fixed 8 MHz clock; RF bus waits are retained.
+The modeled LCD byte cost drops from 559 to 135 instructions, but physical
+refresh speed and the corrected orientation await the owner's next test.

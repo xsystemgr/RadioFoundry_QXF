@@ -267,7 +267,7 @@ const sim_geom_t *sim_geom_find(const char *name)
 	custom.name = name;
 	custom.w = (uint16_t)w;
 	custom.h = (uint16_t)h;
-	custom.bpp = tail == 'm' ? 1 : 16;
+	custom.bpp = tail == 'm' ? 1 : tail == 'p' ? 4 : 16;
 	custom.inset = tail == 'i' ? (uint8_t)inset : 0;
 	custom.inset_tb = tail == 'i' ? (uint8_t)(n == 5 ? inset_tb : inset) : 0;
 	custom.aa = custom.bpp != 1 && w >= 220;	// as the gallery's classes

@@ -1097,8 +1097,16 @@ int main(void)
 	for (size_t i = 0; i < sizeof flows_k / sizeof flows_k[0]; i++)
 		run_flow(&flows_k[i], sim_geom_find("160x120i5"), SIM_MAP_K, "K DM-1701");
 	const sim_geom_t *gf = sim_geom_find("160x128");
-	for (size_t i = 0; i < sizeof flows_f / sizeof flows_f[0]; i++)
+	for (size_t i = 0; i < sizeof flows_f / sizeof flows_f[0]; i++) {
 		run_flow(&flows_f[i], gf, SIM_MAP_F, "F few keys");
+		run_flow(&flows_f[i], sim_geom_find("120x160p"), SIM_MAP_F, "F portrait");
+	}
+	// Experimental compact portrait: keypad FM tuning and the few-key flows.
+	for (size_t i = 0; i < sizeof flows / sizeof flows[0]; i++) {
+		if (strncmp(flows[i].name, "12 ", 3) == 0 || strcmp(flows[i].name, "1 next channel") == 0
+			|| strcmp(flows[i].name, "18 Copy to VFO from an FM channel") == 0)
+			run_flow(&flows[i], sim_geom_find("120x160p"), SIM_MAP_K, "K portrait FM");
+	}
 	printf("# %d flows run\n", flows_run);
 	about_checks();
 	call_screen_checks();
@@ -1108,6 +1116,8 @@ int main(void)
 	crawl(sim_geom_find("160x120i5"), SIM_MAP_K, "K DM-1701");
 	crawl(sim_geom_find("128x64"), SIM_MAP_M, "M GD-77");
 	crawl(gf, SIM_MAP_F, "F few keys");
+	crawl(sim_geom_find("120x160p"), SIM_MAP_K, "K portrait");
+	crawl(sim_geom_find("120x160p"), SIM_MAP_F, "F portrait");
 
 	printf(fails ? "# FAILED uiFlowTest: %d\n" : "# PASSED uiFlowTest\n", fails);
 	return fails != 0;

@@ -5,8 +5,9 @@
 
 This target compiles the existing RadioFoundry core, UI, VFO, channel list, scan,
 settings and radio state machine with an AT32F423 platform and board HAL. VHF/UHF
-receive is implemented and model-tested. No physical radio test has run. This is
-not a supported release. The owner waived clean-room role separation for the
+receive is implemented and model-tested. The owner confirms the first RX binary
+boots and displays the UI, but slowly and in landscape. RF reception and the new
+portrait build have not been physically verified. This is not a supported release. The owner waived clean-room role separation for the
 closed experiment on November 1, 2026. No reference firmware code or tables were
 imported; the existing MIT BK4819 driver supplies the chip implementation.
 
@@ -17,7 +18,7 @@ make -f boards/rt880/Makefile -j8 image test stack-check
 ```
 
 Requirements: the pinned Arm GNU Toolchain and FreeRTOS submodule. The output is
-`build/rt880-lab/rfoundry_rt880_rx_UNTESTED.bin`. No command opens a serial port.
+`build/rt880-lab/rfoundry_rt880_rx_portrait_UNTESTED.bin`. No command opens a serial port.
 The candidate image address is `0x08002800`; loader erase boundaries are unverified.
 
 ## Receive implementation
@@ -52,9 +53,9 @@ The candidate image address is `0x08002800`; loader erase boundaries are unverif
 
 ## Display and controls
 
-The existing ST7789 driver renders a landscape 160x120 indexed UI scaled 2x to
-320x240, with 9,600 bytes of frame buffer. Controller/orientation need hardware
-confirmation. The backlight is on/off. Physical legends are not mapped yet:
+The existing ST7789 driver renders a portrait 120x160 indexed UI scaled 2x to
+240x320, with 9,600 bytes of frame buffer. MADCTL 0x20 follows the orientation
+observed in the supplied reference image. The new orientation needs owner confirmation. The backlight is on/off. Physical legends are not mapped yet:
 
 | Raw matrix position | Temporary RadioFoundry action |
 |---|---|
@@ -91,13 +92,13 @@ and 4 KiB reserved for C heap/main/interrupt stack. A CPU model ran startup and
 speaker on modeled carrier and closed it on signal loss. The second chip stayed
 idle and no PA level or TX state was written. RTOS heap free after task creation
 was 1,608 bytes. Pixel bursts, delays and queue waits were modeled/bypassed; actual
-RF performance, interrupt delivery, context switching, peak heap and physical
-stack usage remain untested.
+RF performance, interrupt/scheduler stress, peak heap and physical stack usage
+remain unmeasured.
 
 MCU family evidence is stronger, but no software model proves the owner's exact
 silicon/PCB, analog wiring, calibration accuracy or bootloader erase behavior.
 Keep a full device-specific backup and the currently working nicFW binary.
-Verify the documented loader entry before the first physical experiment. See the
+The owner confirms the loader is accessible. See the
 [hardware investigation](../../docs/spec/hardware-rt880.md) and
 [bring-up record](../../docs/testing/rt880-bringup.md).
 
@@ -112,3 +113,26 @@ Verify the documented loader entry before the first physical experiment. See the
 
 Retain the source package's RadioFoundry, FreeRTOS and toolchain runtime notices
 with any binary copies. Nothing from this experiment was published to GitHub.
+
+
+## Slow-display correction and preview
+
+The old GPIO byte sender performed two DWT-based microsecond waits per bit.
+At the fixed 8 MHz startup clock this made full-screen clearing/drawing slow.
+Those waits are removed from the LCD sender; RF bus timing is retained. The
+backlight/control pin is enabled before LCD reset/commands. No PLL change is made.
+A compiled-function model sends the same 0xA5 byte with 135 instructions instead
+of 559 under its one-cycle-per-instruction DWT model. This is not a measured
+wall-clock speedup on the radio.
+
+The taller frame adds 160 bytes of row metadata while retaining the same 9,600
+pixel-buffer bytes. Host tests cover its 240-pixel physical row, byte order,
+orientation command and 2x scale. Keypad FM tuning flows, few-key flows and screen
+crawls pass at the custom 120x160p indexed geometry. The existing registered
+classes still pass their full layout checks. The experimental narrow portrait
+profile is not registered as supporting every digital/dual-watch screen.
+
+The [FM](preview/fm.png), [VFO](preview/vfo.png), [menu](preview/menu.png) and
+[settings](preview/settings.png) previews are rendered from the real UI host
+simulator. They show sample content and its full-feature menu configuration,
+not a capture from the radio or a promise that every pictured feature is enabled.
