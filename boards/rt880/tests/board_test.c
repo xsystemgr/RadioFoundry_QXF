@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "board.h"
 #include "platform.h"
+#include "input/input_engine.h"
 
 static unsigned writes;
 static unsigned active_row = 99;
@@ -62,6 +63,54 @@ bool at32_pin_read(uint32_t port, unsigned pin)
 }
 void hal_delay_us(uint32_t value) { (void)value; }
 void hal_delay_ms(uint32_t value) { (void)value; }
+static unsigned event_count, repeat_count;
+static input_event_t last_event;
+static void emit(const input_event_t *event, void *ctx)
+{
+	(void)ctx;
+	event_count++;
+	if (event->gesture == GESTURE_REPEAT) repeat_count++;
+	last_event = *event;
+}
+static void check_key_actions(void)
+{
+	static const uint8_t expected[] = {
+		ACT_DIGIT_1, ACT_DIGIT_4, ACT_DIGIT_7, ACT_QUICK,
+		ACT_DIGIT_2, ACT_DIGIT_5, ACT_DIGIT_8, ACT_DIGIT_0,
+		ACT_DIGIT_3, ACT_DIGIT_6, ACT_DIGIT_9, ACT_VFO_TOGGLE,
+		ACT_SELECT, ACT_NAV_UP, ACT_NAV_DOWN, ACT_BACK,
+	};
+	for (unsigned key = 0; key < 16; key++) {
+		input_engine_t engine;
+		input_engine_init(&engine, board.keymap, board.keymap_len, 0);
+		event_count = repeat_count = 0;
+		pressed = 99;
+		input_engine_step(&engine, board.input->scan(), 0, 10, emit, NULL);
+		pressed = key;
+		for (unsigned t = 20; t <= 50; t += 10)
+			input_engine_step(&engine, board.input->scan(), 0, t, emit, NULL);
+		pressed = 99;
+		for (unsigned t = 60; t <= 90; t += 10)
+			input_engine_step(&engine, board.input->scan(), 0, t, emit, NULL);
+		assert(event_count == 1 && last_event.action == expected[key]);
+		assert(last_event.gesture == GESTURE_PRESS);
+	}
+	// Held arrows repeat the same direction; * reaches the core's lock gesture.
+	const unsigned held_keys[] = { 13, 14, 3, 15 };
+	for (unsigned i = 0; i < sizeof(held_keys)/sizeof(held_keys[0]); i++) {
+		input_engine_t engine;
+		input_engine_init(&engine, board.keymap, board.keymap_len, 0);
+		event_count = repeat_count = 0;
+		pressed = 99;
+		input_engine_step(&engine, 0, 0, 10, emit, NULL);
+		pressed = held_keys[i];
+		for (unsigned t = 20; t <= 1200; t += 10)
+			input_engine_step(&engine, board.input->scan(), 0, t, emit, NULL);
+		assert(event_count > 0 && last_event.action == expected[held_keys[i]]);
+		assert(i < 2 ? repeat_count > 0 : last_event.gesture == GESTURE_LONG);
+	}
+	pressed = 99;
+}
 int main(void)
 {
 	for (uint32_t hz = 1000000; hz <= 1000000000; hz += 1000000) {
@@ -78,7 +127,7 @@ int main(void)
 		if (action >= ACT_DIGIT_0 && action <= ACT_DIGIT_9) digits |= 1u << (action - ACT_DIGIT_0);
 	}
 	assert(digits == 0x3FFu);
-	assert(board.keymap[5].short_action == ACT_VFO_TOGGLE);
+	assert(board.keymap[11].short_action == ACT_VFO_TOGGLE);
 	assert(!board.flash->init());
 	assert(!board.flash->write(0, "x", 1));
 	assert(!board.flash->erase(0));
@@ -91,6 +140,7 @@ int main(void)
 	}
 	pressed = 99;
 	assert(board.input->scan() == 0);
+	check_key_actions();
 	board_early_init();
 	board.display->init();
 	assert(serial_bits == 0 && last_command == 0x29);
@@ -115,6 +165,6 @@ int main(void)
 	assert(first_pixel == 0x12 && last_data == 0x78 && pins[0][15]);
 	assert(columns[0] == 0 && columns[1] == 0 && columns[2] == 0 && columns[3] == 239);
 	assert(lines[0] == 1 && lines[1] == 62 && lines[2] == 1 && lines[3] == 63);
-	puts("board-test: TX/storage denied; matrix and serial LCD/scale/byte order passed");
+	puts("board-test: TX/storage denied; matrix/key legends/gestures and serial LCD/scale/byte order passed");
 	return 0;
 }

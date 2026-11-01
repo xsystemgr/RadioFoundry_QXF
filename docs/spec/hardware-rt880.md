@@ -354,3 +354,18 @@ checks of speed, audio and RF remain outstanding. Earlier sections are history.
 
 Clock source: [official AT32F423 RM 2.03](https://www.arterychip.com/download/RM/RM_AT32F423_EN_V2.03.pdf),
 sections 4.1.1, 4.3.23, 4.3.24 and 5.8.1.
+
+## Fix4: keypad translation
+
+The owner reports the menu buttons do not match the front panel. Isolated
+reference key-decoder observations map electrical bits 0..3 to 1/4/7/*,
+4..7 to 2/5/8/0, 8..11 to 3/6/9/# and 12..15 to Menu/Up/Down/Exit. The
+original positional key map was incorrect. Front labels are inferred from
+numeric-entry/navigation consumers and the visible keycaps, awaiting an owner
+check; no claim is made about ADC side-key identities.
+
+Fix4 corrects board-level actions and arrow long/repeat actions. Green Menu
+selects, orange Exit backs out, * opens Quick (held: lock) and # V/M toggles
+VFO/channel. Monitor is available in Quick instead of on a digit key. The
+actual input-engine host test checks every physical scan bit and held gestures.
+The radio core, fix3 clock/audio path and RX-only restrictions are unchanged.

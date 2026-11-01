@@ -110,24 +110,25 @@ static uint32_t input_scan(void)
 }
 static int8_t encoder(void) { return 0; }
 static const hal_input_t input = { .init = input_init, .scan = input_scan, .encoder = encoder };
-// Temporary positional controls, not claims about the printed key legends. No PTT binding.
+// Matrix coordinates follow electrical scan order, not the front-panel rows.
+// Front legends inferred from the reference key translation; no PTT binding.
 static const keymap_entry_t keys[] = {
-	{ .bit = 0, .short_action = ACT_NAV_UP, .repeat = true },
-	{ .bit = 1, .short_action = ACT_NAV_DOWN, .repeat = true },
-	{ .bit = 2, .short_action = ACT_SELECT, .long_action = ACT_SELECT },
-	{ .bit = 3, .short_action = ACT_BACK },
-	{ .bit = 4, .short_action = ACT_MONITOR, .raw_edges = true },
-	{ .bit = 5, .short_action = ACT_VFO_TOGGLE },
-	{ .bit = 6, .short_action = ACT_DIGIT_0 },
-	{ .bit = 7, .short_action = ACT_DIGIT_1 },
-	{ .bit = 8, .short_action = ACT_DIGIT_2 },
-	{ .bit = 9, .short_action = ACT_DIGIT_3 },
-	{ .bit = 10, .short_action = ACT_DIGIT_4 },
-	{ .bit = 11, .short_action = ACT_DIGIT_5 },
-	{ .bit = 12, .short_action = ACT_DIGIT_6 },
-	{ .bit = 13, .short_action = ACT_DIGIT_7 },
-	{ .bit = 14, .short_action = ACT_DIGIT_8 },
-	{ .bit = 15, .short_action = ACT_DIGIT_9 },
+	{ .bit = 0, .short_action = ACT_DIGIT_1, .long_action = ACT_DIGIT_1 },
+	{ .bit = 1, .short_action = ACT_DIGIT_4, .long_action = ACT_DIGIT_4 },
+	{ .bit = 2, .short_action = ACT_DIGIT_7, .long_action = ACT_DIGIT_7 },
+	{ .bit = 3, .short_action = ACT_QUICK, .long_action = ACT_QUICK, .dtmf = '*' },
+	{ .bit = 4, .short_action = ACT_DIGIT_2, .long_action = ACT_DIGIT_2 },
+	{ .bit = 5, .short_action = ACT_DIGIT_5, .long_action = ACT_DIGIT_5 },
+	{ .bit = 6, .short_action = ACT_DIGIT_8, .long_action = ACT_DIGIT_8 },
+	{ .bit = 7, .short_action = ACT_DIGIT_0, .long_action = ACT_DIGIT_0 },
+	{ .bit = 8, .short_action = ACT_DIGIT_3, .long_action = ACT_DIGIT_3 },
+	{ .bit = 9, .short_action = ACT_DIGIT_6, .long_action = ACT_DIGIT_6 },
+	{ .bit = 10, .short_action = ACT_DIGIT_9, .long_action = ACT_DIGIT_9 },
+	{ .bit = 11, .short_action = ACT_VFO_TOGGLE, .long_action = ACT_VFO_TOGGLE, .dtmf = '#' },
+	{ .bit = 12, .short_action = ACT_SELECT, .long_action = ACT_SELECT },
+	{ .bit = 13, .short_action = ACT_NAV_UP, .long_action = ACT_NAV_UP, .repeat = true },
+	{ .bit = 14, .short_action = ACT_NAV_DOWN, .long_action = ACT_NAV_DOWN, .repeat = true },
+	{ .bit = 15, .short_action = ACT_BACK, .long_action = ACT_BACK },
 };
 
 static bool flash_init(void) { return false; }

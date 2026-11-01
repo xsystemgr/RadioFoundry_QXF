@@ -8,7 +8,7 @@ settings and radio state machine with an AT32F423 platform and board HAL. VHF/UH
 receive is implemented and model-tested. The owner confirms the first RX binary
 boots and displays the UI. The owner confirms fix2 displays in the correct orientation but remains slow.
 The indicator reacts to a transmitted signal, with no audible speaker output.
-Monitor has not been tried. Fix3 awaits a physical test; demodulation and audio
+Monitor has not been tried. Fix4 with corrected front-key mapping awaits a physical test; demodulation and audio
 remain unverified. This is not a supported release. The owner waived clean-room role separation for the
 closed experiment on November 1, 2026. No reference firmware code or tables were
 imported; the existing MIT BK4819 driver supplies the chip implementation.
@@ -20,7 +20,7 @@ make -f boards/rt880/Makefile -j8 image test stack-check
 ```
 
 Requirements: the pinned Arm GNU Toolchain and FreeRTOS submodule. The output is
-`build/rt880-lab/rfoundry_rt880_rx_audio_fix3_UNTESTED.bin`. No command opens a serial port.
+`build/rt880-lab/rfoundry_rt880_rx_keys_fix4_UNTESTED.bin`. No command opens a serial port.
 The candidate image address is `0x08002800`; loader erase boundaries are unverified.
 
 ## Receive implementation
@@ -58,20 +58,33 @@ The candidate image address is `0x08002800`; loader erase boundaries are unverif
 The existing ST7789 driver renders a portrait 120x160 indexed UI scaled 2x to
 240x320, with 9,600 bytes of frame buffer. Fix2 uses MADCTL 0x00: bit 5 must
 be clear for this 240-column, 320-row window. The previous 0x20 exchanged the
-axes; the owner confirmed the rotated/noisy result. Fix2 needs owner confirmation. The backlight is on/off. Physical legends are not mapped yet:
+axes; the owner confirmed the rotated/noisy result. Fix2 needs owner confirmation. The backlight is on/off. Fix4 maps the inferred front legends as follows; owner confirmation is pending:
 
-| Raw matrix position | Temporary RadioFoundry action |
-|---|---|
-| 0 | Up / channel +1 |
-| 1 | Down / channel -1 |
-| 2 | Select; hold for the existing Quick menu |
-| 3 | Back |
-| 4, held | Monitor / open squelch |
-| 5 | VFO/channel toggle |
-| 6-15 | Digits 0-9 in order |
+| Front key | Raw matrix bit | RadioFoundry action |
+|---|---|---|
+| 0 | 7 | Digit 0 |
+| 1 | 0 | Digit 1 |
+| 2 | 4 | Digit 2 |
+| 3 | 8 | Digit 3 |
+| 4 | 1 | Digit 4 |
+| 5 | 5 | Digit 5 |
+| 6 | 9 | Digit 6 |
+| 7 | 2 | Digit 7 |
+| 8 | 6 | Digit 8 |
+| 9 | 10 | Digit 9 |
+| Green Menu/OK | 12 | Select / open menu |
+| Up arrow | 13 | Up; hold repeats |
+| Down arrow | 14 | Down; hold repeats |
+| Orange Exit | 15 | Back; hold returns Home |
+| * / lock | 3 | Quick settings; hold locks/unlocks from Home |
+| # V/M | 11 | Channel/VFO toggle |
 
-Positions are row-major. Rows are PB10, PB2, PB1, PB0; columns PC10, PC11, PC12,
-PD2. These actions are positional diagnostics, not claims about printed legends.
+The electrical scan is column-oriented relative to the front digits: its first
+four positions are 1, 4, 7, *. Rows are PB10, PB2, PB1, PB0; columns PC10,
+PC11, PC12, PD2. Fix4 replaces the old temporary positional actions. Monitor is
+now selected in Quick settings; no digit key is used as a held Monitor key.
+ADC side keys remain unimplemented.
+
 The built-in fallback channels include 145.500, 146.520, 146.550 and 433.500 MHz.
 In VFO mode, enter `145500` and Select for 145.500 MHz (the existing core entry
 format). Up/down then step the VFO frequency.
@@ -192,3 +205,19 @@ Native tests cover gain clamp, mute/unmute, retained audio requests, readbacks,
 and bus direction changes, while retaining the PA/TX guards. The compiled
 startup/RF model passes from reset and a modeled inherited PLL configuration.
 Physical speed, RF demodulation, speaker routing and volume need owner checks.
+
+## Fix4: front-key mapping
+
+The owner reports menu buttons do not match the legends. The previous key map
+assigned navigation/digits to arbitrary electrical positions. The reference
+key decoder translates the first scan column to 1, 4, 7, *, the next to 2, 5,
+8, 0, the next to 3, 6, 9, #, and the last to Menu, Up, Down, Exit. Decimal entry
+and navigation/exit consumers support those meanings; the front legend labels
+remain inferred until the owner presses them with this image.
+
+Fix4 changes only the board key map: it retains the RadioFoundry menu/Quick/
+key-lock behavior, fix3 clock/audio diagnostics and all RX-only restrictions.
+Arrow long actions now match their short actions so held navigation repeats.
+The native board test drives every pin position through the actual input
+engine and checks all 16 short actions, arrow repeats, long * and long Back.
+No ADC side-key or PTT binding is added. Access Monitor from Quick settings.

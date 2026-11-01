@@ -4,7 +4,7 @@
 # Run from the repository root: make -f boards/rt880/Makefile
 .DEFAULT_GOAL := all
 BUILD := build/rt880-lab
-TARGET := $(BUILD)/rfoundry_rt880_rx_audio_fix3_UNTESTED
+TARGET := $(BUILD)/rfoundry_rt880_rx_keys_fix4_UNTESTED
 ARM_GCC_DIR ?= $(firstword $(wildcard $(HOME)/opt/arm-gnu-toolchain-*-arm-none-eabi/bin/) /usr/bin/)
 CROSS ?= $(ARM_GCC_DIR)arm-none-eabi-
 CC := $(CROSS)gcc
@@ -45,7 +45,7 @@ image: $(TARGET).elf
 test:
 	@mkdir -p $(BUILD)
 	cc -std=c11 -Wall -Wextra -Werror -Ihal -Icore -Idrivers -Iplatform/at32f423 \
-		boards/rt880/board.c boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c drivers/display/st7789/st7789.c boards/rt880/tests/board_test.c -o $(BUILD)/board-test
+		boards/rt880/board.c boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c drivers/display/st7789/st7789.c core/input/input_engine.c boards/rt880/tests/board_test.c -o $(BUILD)/board-test
 	$(BUILD)/board-test
 	cc -std=c11 -Wall -Wextra -Werror -Ihal -Icore -Idrivers -Iplatform/at32f423 \
 		boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c boards/rt880/tests/radio_test.c -o $(BUILD)/radio-test
