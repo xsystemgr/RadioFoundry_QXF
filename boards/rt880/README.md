@@ -20,7 +20,7 @@ make -f boards/rt880/Makefile -j8 image test stack-check
 ```
 
 Requirements: the pinned Arm GNU Toolchain and FreeRTOS submodule. The output is
-`build/rt880-lab/rfoundry_rt880_rx_keys_fix4_UNTESTED.bin`. No command opens a serial port.
+`build/rt880-lab/rfoundry_rt880_rx_speaker_fix5_UNTESTED.bin`. No command opens a serial port.
 The candidate image address is `0x08002800`; loader erase boundaries are unverified.
 
 ## Receive implementation
@@ -257,3 +257,43 @@ to the development environment.
 
 Register meanings: [Beken register list](https://alfaexploit.com/files/BK4819V3Registers_List_20201218.pdf),
 registers 0x30, 0x37, 0x47 and 0x48.
+
+## Fix5: owner AF readbacks and opt-in local speaker test
+
+The owner photo shows RF IDs 4819/4819, AF 6140, gain B3BF, commanded Audio
+OPEN at volume 100, configured CPU 48 MHz, tune 433125000 Hz and RSSI/noise
+around -82 dBm/18. It confirms chip communication and AF register programming;
+it does not show an audible output or physical amplifier state.
+
+Fix5 adds a local RX Tone1 test, requested only by holding * during startup.
+Hold only * while powering on, keep it held through startup (about three
+seconds), then release. After the first valid receive tune it sends two 150 ms
+1 kHz tones, separated by 150 ms. It uses AF selection 2 (6240), Tone1 registers
+70/71 and the existing mute/amplifier pins. Receiver enables stay BFF1, RF B
+stays idle, PA level stays zero. It does not call the TX tone APIs. Normal
+startup does not send the tone. The previous generator registers and the core's
+audio request are restored, and later retunes do not repeat the test.
+
+Diagnostics add actual GPIO input samples PC4/PF8, cached receiver registers
+30/37, voice amplitude register 64, and the test's AF/pad observations. With
+audio open, expected pad logic is PC4=0/PF8=1; the test reports TestAF 6240 and
+P:2 if those input samples matched during the tone. These are logic samples,
+not speaker voltage or current measurements. Press * (More) in Diagnostics to
+page to the new lines.
+
+Native and compiled tests check the boot-key opt-in, two tone pulses, register
+restoration, no repeat on retune and normal audio afterward. The RX-only init
+also skips a shared main-startup word 0302: bit 1 enables TX DSP even though PA
+and synthesizer were off. Earlier guards checked bit 14 and missed that bit.
+Tests now reject bits 3:1 (PA gain, microphone ADC and TX DSP) throughout the
+RX-only path. Ordinary shared main/LO startup is unchanged. This is a guard
+correction, not an established explanation for the silent speaker.
+
+No speculative AF filter/LDO/profile or unknown GPIO changes are included, so
+the tone result can guide the next step. Physical tone audibility and the new
+GPIO samples await the owner. The generic RadioFoundry UI and confirmed keymap
+are retained. Software Volume is Settings > Sound > Volume (0..16); Monitor and
+Squelch are in Quick settings.
+
+Tone/register reference: [Beken register list](https://alfaexploit.com/files/BK4819V3Registers_List_20201218.pdf),
+AF selection 2 and registers 30, 70, 71.

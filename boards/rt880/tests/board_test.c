@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "board.h"
 #include "platform.h"
+#include "../radio.h"
 #include "input/input_engine.h"
 
 static unsigned writes;
@@ -141,6 +142,9 @@ int main(void)
 	pressed = 99;
 	assert(board.input->scan() == 0);
 	check_key_actions();
+	pressed = 3; assert(rt880_audio_test_boot_requested());
+	pressed = 0; assert(!rt880_audio_test_boot_requested());
+	pressed = 99; assert(!rt880_audio_test_boot_requested());
 	board_early_init();
 	board.display->init();
 	assert(serial_bits == 0 && last_command == 0x29);

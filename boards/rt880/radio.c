@@ -17,6 +17,9 @@ static uint8_t volume_percent = 50;
 static uint16_t af_readback, gain_readback;
 static int16_t last_rssi = -127;
 static uint8_t last_noise = 255;
+static bool test_requested, test_ran;
+static uint16_t enables_readback, power_readback, voice_level, test_af;
+static uint8_t test_pads;
 
 static void cs_a(bool high) { at32_pin_write(AT32_GPIO_C, 7, high); }
 static void clk_a(bool high) { at32_pin_write(AT32_GPIO_C, 8, high); }
@@ -93,6 +96,8 @@ static void audio_apply(void)
 	if (ready) {
 		af_readback = bk4819_read(&receiver, BK4819_REG_AF);
 		gain_readback = bk4819_read(&receiver, BK4819_REG_AF_GAIN);
+		enables_readback = bk4819_read(&receiver, BK4819_REG_ENABLES);
+		power_readback = bk4819_read(&receiver, BK4819_REG_POWER);
 	}
 }
 static void audio(bool on)
@@ -106,6 +111,32 @@ static void volume(uint8_t percent)
 	if (ready) bk4819_set_af_gain(&receiver, (uint8_t)((volume_percent * 15u + 50u) / 100u));
 	audio_apply();
 }
+// Local Tone1 through AF selection 2: receiver/DAC only, never a TX state.
+static void startup_audio_test(void)
+{
+	uint16_t saved70 = bk4819_read(&receiver, BK4819_REG_TONE_CTRL);
+	uint16_t saved71 = bk4819_read(&receiver, BK4819_REG_TONE1_FREQ);
+	test_requested = false;
+	bk4819_write(&receiver, BK4819_REG_TONE_CTRL, 0);
+	bk4819_write(&receiver, BK4819_REG_TONE1_FREQ, bk4819_tone_word(1000));
+	bk4819_set_af(&receiver, 0x6240); // documented Tone Out for RX
+	test_af = bk4819_read(&receiver, BK4819_REG_AF);
+	at32_pin_write(AT32_GPIO_F, 8, true);
+	hal_delay_ms(20);
+	for (unsigned pulse = 0; pulse < 2; pulse++) {
+		bk4819_write(&receiver, BK4819_REG_TONE_CTRL, 0xB000);
+		at32_pin_write(AT32_GPIO_C, 4, false);
+		test_pads = (uint8_t)(at32_pin_read(AT32_GPIO_C, 4) | (at32_pin_read(AT32_GPIO_F, 8) << 1));
+		hal_delay_ms(150);
+		at32_pin_write(AT32_GPIO_C, 4, true);
+		bk4819_write(&receiver, BK4819_REG_TONE_CTRL, 0);
+		hal_delay_ms(150);
+	}
+	bk4819_write(&receiver, BK4819_REG_TONE1_FREQ, saved71);
+	bk4819_write(&receiver, BK4819_REG_TONE_CTRL, saved70);
+	test_ran = true;
+	audio_apply(); // restore the core's request, gain and speaker state unchanged
+}
 static uint16_t route(uint32_t hz)
 {
 	if (hz >= 136000000u && hz <= 174000000u) return 0x10;
@@ -116,6 +147,9 @@ static void init(void)
 {
 	rt880_rf_halt();
 	started = false;
+	test_requested = rt880_audio_test_boot_requested();
+	test_ran = false;
+	test_af = test_pads = voice_level = 0;
 	volume_percent = 50;
 	af_readback = gain_readback = 0;
 	drive_a = drive_b = false;
@@ -171,6 +205,7 @@ static bool receive(uint32_t hz, radio_bw_t bw, const subtone_t *tone)
 	frequency = hz;
 	tuned = true;
 	hal_delay_ms(10); // conservative acquisition, not an ultra-scan profile
+	if (test_requested) startup_audio_test();
 	return true;
 }
 static bool transmit(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
@@ -189,6 +224,7 @@ static void status(radio_status_t *value)
 	value->tone_ok = true;
 	last_rssi = value->rssi_dbm;
 	last_noise = value->noise;
+	voice_level = bk4819_read(&receiver, 0x64);
 }
 const hal_radio_t rt880_radio = {
 	.init = init, .set_mode = mode, .rx = receive, .tx = transmit,
@@ -203,6 +239,11 @@ bool rt880_rf_diag(uint8_t line, char *buf, uint8_t len)
 	case 3: snprintf(buf, len, "AF:%04X G:%04X", af_readback, gain_readback); break;
 	case 4: snprintf(buf, len, "Audio %s V:%u", audio_open ? "OPEN" : "MUTE", volume_percent); break;
 	case 5: snprintf(buf, len, "RSSI:%d N:%u", last_rssi, last_noise); break;
+	case 6: snprintf(buf, len, "PC4:%u PF8:%u", (unsigned)at32_pin_read(AT32_GPIO_C, 4), (unsigned)at32_pin_read(AT32_GPIO_F, 8)); break;
+	case 7: snprintf(buf, len, "30:%04X 37:%04X", enables_readback, power_readback); break;
+	case 8: snprintf(buf, len, "Voice:%04X", voice_level); break;
+	case 9: snprintf(buf, len, "Test %s", test_ran ? "sent" : "hold * at boot"); break;
+	case 10: snprintf(buf, len, "TestAF:%04X P:%u", test_af, test_pads); break;
 	default: return false;
 	}
 	return true;

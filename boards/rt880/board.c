@@ -108,6 +108,7 @@ static uint32_t input_scan(void)
 	last_keys = result;
 	return result;
 }
+bool rt880_audio_test_boot_requested(void) { return input_scan() == (1u << 3); }
 static int8_t encoder(void) { return 0; }
 static const hal_input_t input = { .init = input_init, .scan = input_scan, .encoder = encoder };
 // Matrix coordinates follow electrical scan order, not the front-panel rows.

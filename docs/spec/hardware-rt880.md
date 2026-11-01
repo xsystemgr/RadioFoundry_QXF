@@ -386,3 +386,24 @@ neither difference is a proven cause of silence. Physical IDs/AF/gain/audio
 readbacks are required before attributing the fault to the external analog
 path or another receiver setup field. No firmware change is made at this
 checkpoint; the working keymap and current binary remain unchanged.
+
+## Fix5 after owner diagnostic photo
+
+The photo shows IDs 4819/4819, AF 6140, gain B3BF, Audio OPEN at V:100,
+tune 433125000 Hz, configured CPU 48 MHz and RSSI/noise about -82/18. Speaker
+silence remains unresolved. Fix5 adds an opt-in local RX Tone1 test: hold * at
+startup to request two 150 ms 1 kHz pulses after the first valid receive tune.
+AF selection 2 (6240) routes Tone1 to the receiver DAC; no TX APIs are used.
+The test restores generator state/audio request and runs once per opted-in boot.
+
+Diagnostics add GPIO pad input levels for PC4/PF8, registers 30/37 and voice
+amplitude 64, plus the tone's AF/pad samples. Expected open pads are 0/1;
+TestAF 6240/P:2 confirms only modeled or sampled logic, not audibility. In
+Diagnostics, * pages to the additional rows. Volume is Settings > Sound >
+Volume, maximum step 16, rather than Quick settings.
+
+RX-only initialization now skips the shared startup word 0302, whose bit 1 is
+TX DSP enable; PA and synthesizer were off at that word. Prior audit checked
+bit 14 and was incomplete. The corrected tests reject enable bits 3:1 on every
+RX-only frame. Ordinary main/LO initialization is unaffected. This correction
+is not evidence for the cause of silence. The owner must test tone audibility.

@@ -16,7 +16,9 @@ typedef struct {
 	uint16_t regs[128], id, response;
 } chip_t;
 static chip_t chips[2];
-static bool pins[6][16], panic;
+static bool pins[6][16], panic, boot_star;
+static unsigned tone_pulses;
+bool rt880_audio_test_boot_requested(void) { return boot_star; }
 static unsigned gpio_writes, critical_depth, frames;
 
 static void select_chip(unsigned index, bool high)
@@ -33,7 +35,7 @@ static void select_chip(unsigned index, bool high)
 		uint16_t value = (uint16_t)c->shift;
 		if (reg == 0x36) assert(value == 0);
 		if (reg == 0x30) {
-			assert((value & 0x4000u) == 0); // TX DSP enable must never be set
+			assert((value & 0x400Eu) == 0); // PA gain, microphone ADC and TX DSP bits stay clear
 			if (index == 1) assert(value == 0);
 		}
 		if (reg == 0x33) {
@@ -84,6 +86,8 @@ void at32_pin_input_floating(uint32_t port, unsigned pin)
 }
 bool at32_pin_read(uint32_t port, unsigned pin)
 {
+	if ((port == AT32_GPIO_C && pin == 4) || (port == AT32_GPIO_F && pin == 8))
+		return pins[(port - AT32_GPIO_A) / 0x400][pin];
 	assert(port == AT32_GPIO_C && (pin == 6 || pin == 9));
 	chip_t *c = &chips[pin == 6 ? 0 : 1];
 	assert(c->reading && c->read_bits >= 1 && c->read_bits <= 16);
@@ -92,7 +96,16 @@ bool at32_pin_read(uint32_t port, unsigned pin)
 uint32_t at32_irq_save(void) { return critical_depth++; }
 void at32_irq_restore(uint32_t saved) { assert(critical_depth == saved + 1); critical_depth = saved; }
 void hal_delay_us(uint32_t us) { (void)us; assert(!panic); }
-void hal_delay_ms(uint32_t ms) { (void)ms; assert(!panic); }
+void hal_delay_ms(uint32_t ms)
+{
+	assert(!panic);
+	if (ms == 150) {
+		assert(chips[0].regs[0x30] == BK4819_STATE_RX && chips[1].regs[0x30] == 0);
+		assert(chips[0].regs[0x47] == 0x6240 && chips[0].regs[0x71] == bk4819_tone_word(1000));
+		if (!pins[2][4]) { assert(pins[5][8] && chips[0].regs[0x70] == 0xB000); tone_pulses++; }
+		else assert(chips[0].regs[0x70] == 0);
+	}
+}
 
 static void tx_is_blocked(void)
 {
@@ -139,8 +152,8 @@ int main(void)
 	radio_status_t status;
 	unsigned setups = chips[0].output_setups;
 	rt880_radio.status(&status);
-	// Two reads: change direction once per command, never for each data bit.
-	assert(chips[0].output_setups - setups <= 2);
+	// Three reads: change direction once per command, never for each data bit.
+	assert(chips[0].output_setups - setups <= 3);
 	assert(status.rssi_dbm == -90 && status.noise == 23 && status.tone_ok);
 	assert(rt880_radio.rx(433500000, RADIO_BW_12K5, NULL));
 	assert(chips[1].regs[0x33] == 0x20 && pins[2][4] && !pins[5][8]);
@@ -181,6 +194,16 @@ int main(void)
 		assert(pins[2][4] && !pins[5][8]);
 		chips[index].id = BK4819_ID;
 	}
+	boot_star = true;
+	rt880_radio.init();
+	assert(rt880_radio.rx(145500000, RADIO_BW_25K, NULL));
+	assert(tone_pulses == 2 && chips[0].regs[0x70] == 0 && chips[0].regs[0x71] == 0);
+	assert(chips[0].regs[0x47] == BK4819_AF_MUTE && pins[2][4] && !pins[5][8]);
+	assert(chips[0].regs[0x48] == 0xB3B8);
+	assert(rt880_rf_diag(10, diag, sizeof(diag)) && strstr(diag, "TestAF:6240 P:2"));
+	assert(rt880_radio.rx(433500000, RADIO_BW_25K, NULL) && tone_pulses == 2);
+	rt880_radio.audio(true);
+	assert(!pins[2][4] && pins[5][8] && chips[0].regs[0x47] == BK4819_AF_FM);
 	assert(critical_depth == 0);
 	printf("radio-test: RX routes/tuning/status/audio, ID failures and fault shutdown passed (%u frames); TX always denied\n", frames);
 	return 0;
