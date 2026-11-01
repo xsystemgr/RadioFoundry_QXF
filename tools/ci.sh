@@ -192,6 +192,12 @@ for f in sys.argv[1:]:
 	else
 		bad "python: syntax errors"
 	fi
+	if python3 -m unittest discover -s tools/tests > "$OUT/tool-tests.log" 2>&1; then
+		ok "offline tool tests: $(grep -E '^Ran [0-9]+ tests' "$OUT/tool-tests.log")"
+	else
+		tail -20 "$OUT/tool-tests.log"
+		bad "offline tool tests (see $OUT/tool-tests.log)"
+	fi
 	if python3 -c 'import pytest' 2>/dev/null; then
 		if python3 -m pytest tests/hil --collect-only -q -p no:cacheprovider > "$OUT/hil-collect.log" 2>&1; then
 			ok "HIL tests collect ($(grep -cE '::' "$OUT/hil-collect.log") tests; run them with the radio, tests/hil/README.md)"

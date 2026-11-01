@@ -190,3 +190,47 @@ the owner's unit. Full external storage restore through RMS requires a running n
 application. Retain both a matching working application image and device-specific
 storage/codeplug/power/calibration backups; the application file alone contains none
 of those external data backups. No radio was written during this investigation.
+
+## Memory capacity experiment
+
+The owner supplied serial `25UV98P00696`. Its suffix alone does not verify the MCU,
+loader profile or PCB revision. The following budget remains conditional on a 48 KiB
+SRAM device. No hardware identification was performed.
+
+An existing RadioFoundry board configuration was compiled with Arm GCC 13.3.Rel1,
+LTO and a 160 by 120 indexed frame buffer. This was a capacity experiment using
+the DM-1701 platform and drivers, not an RT-880 target. FM, VFO, FM VFO, diagnostics,
+UI color/settings, key assignment, channel list and scan were enabled. All other
+feature switches were explicitly disabled, including DMR, USB, GPS and APRS.
+
+| Allocation | Bytes |
+|---|---:|
+| Initialized RAM data | 1,088 |
+| Main zero-initialized state, including 9,600-byte frame buffer | 27,520 |
+| CPU-only zero-initialized state | 720 |
+| RTOS heap, reduced from 28 KiB for this experiment | 12,288 |
+| C heap and main/interrupt stack reservations | 6,144 |
+| Total allocated RAM | 47,760 |
+| Remaining in 48 KiB | 1,392 |
+| Loaded application flash | 112,456 |
+
+The default 28 KiB RTOS heap instead requires 64,144 bytes of aggregate RAM,
+exceeding 48 KiB by 14,992 bytes. A second link placed both CPU-only sections
+and ordinary RAM sections in one 48 KiB region and succeeded with the reduced
+heap. It retained the reference board's image address and startup; it is not
+compatible firmware for the RT-880. No BIN was generated for distribution.
+
+The reference configuration's static task-stack check passed. This does not
+validate runtime heap peaks, interrupt nesting, the new platform's call chains
+or safe boot. The 12 KiB heap needs measured allocation peaks and failure-path
+testing. Do not shrink task stacks merely to obtain a successful link.
+
+The generic [ELF memory inspector](../../tools/inspect_elf_memory.py) counts all
+allocated sections inside explicitly supplied RAM regions, including NOLOAD
+reservations. It excludes writable-tagged flash constructor arrays and counts
+read-only code/data if linked in RAM. It checks aggregate capacity, not address
+compatibility, section alignment gaps, hardware identity or flashing safety.
+
+This establishes a plausible reduced-memory starting point for an independently
+implemented platform. It does not complete board glue, the PA safe-off state,
+display adaptation, calibration protection or loader/recovery validation.
