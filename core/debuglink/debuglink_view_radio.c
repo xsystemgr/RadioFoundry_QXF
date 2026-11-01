@@ -334,6 +334,25 @@ uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *a, uint16_t len)
 		radio_req_dmr_rx_tg(tg);
 		return DL_ST_OK;
 	}
+	case DL_OP_PRIVACY_BAND: {
+		if (len < 9 || a[0] >= SETTINGS_PRIVACY_BANDS) {
+			return DL_ST_BAD_ARG;
+		}
+		uint32_t lo = (uint32_t)a[1] | ((uint32_t)a[2] << 8) | ((uint32_t)a[3] << 16) | ((uint32_t)a[4] << 24);
+		uint32_t hi = (uint32_t)a[5] | ((uint32_t)a[6] << 8) | ((uint32_t)a[7] << 16) | ((uint32_t)a[8] << 24);
+		if (lo != 0 && (hi < lo || hi > 3000000u)) {
+			return DL_ST_BAD_ARG;
+		}
+		if (!CONFIG_DMR_PRIVACY) {
+			return DL_ST_UNAVAILABLE;
+		}
+		settings_t *st = settings_begin();
+		st->privacy_band[a[0]][0] = lo;
+		st->privacy_band[a[0]][1] = lo != 0 ? hi : 0;
+		settings_end(hal_millis());
+		radio_req_reload();	// the channel's DMR set-up again: our calls in or out of privacy at once
+		return DL_ST_OK;
+	}
 	case DL_OP_ROAM:
 		if (len < 1 || a[0] > RROAM_LOCK_TOGGLE) {
 			return DL_ST_BAD_ARG;

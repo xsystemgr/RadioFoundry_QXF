@@ -32,6 +32,18 @@ enum {
 	DL_CMD_CODEPLUG		= 0x1C,	// the fast codeplug protocol (CONFIG_CPS_FAST; core/cps/cps_fast.c, 3.20, cps-fast.md)
 	DL_CMD_WATCHDOG		= 0x1D,	// the hardware watchdog's bench tests (CONFIG_WATCHDOG; debuglink_watchdog.c, 3.21)
 	DL_CMD_RX2		= 0x1E,	// the second receiver's SoC: state, the update bridge, restart (debuglink_rx2.c, 3.22)
+	DL_CMD_OTAP		= 0x1F,	// fleet administration: provisioning and the PC console (debuglink_otap.c, 3.23, otap.md 6)
+};
+
+// DL_CMD_OTAP operations (first payload byte; docs/spec/debuglink.md 3.23, docs/spec/otap.md 6). IDs are u24 big
+// endian, as on air
+enum {
+	DL_OTAP_OP_INFO = 0,	// -> status, flags u8, counter u32, admin0 u24, admin1 u24, secret_set u8
+	DL_OTAP_OP_SECRET,	// 32 octets set this radio's shared secret (0 octets clear it); never read back
+	DL_OTAP_OP_FLAGS,	// u8 (SETTINGS_OTAP_*): what a signed command may do here
+	DL_OTAP_OP_ADMIN,	// index u8 (0/1), id u24: an admin allowed to command us (0 = unused)
+	DL_OTAP_OP_SEND,	// a whole signed message the PC built (otap.h): put on air to its target
+	DL_OTAP_OP_RECV,	// -> status, have u8; if 1: src u24, len u8, the reply message
 };
 
 // DL_CMD_RX2 operations (first payload byte; docs/spec/debuglink.md 3.22). The token is u32 little endian

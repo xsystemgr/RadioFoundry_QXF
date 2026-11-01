@@ -106,6 +106,15 @@ zoneShareTest: zoneShareTest.c fuzz.h $(CORE)/dmr/zoneShare.c $(CORE)/dmr/zoneSh
 dmrPrivacyTest: dmrPrivacyTest.c $(CORE)/dmr/dmrPrivacy.c $(CORE)/dmr/dmrPrivacy.h $(CORE)/dmr/ambe/ambeFec.c
 	$(CC) $(CFLAGS) -o $@ dmrPrivacyTest.c $(CORE)/dmr/dmrPrivacy.c $(CORE)/dmr/ambe/ambeFec.c
 
+TESTS   += otapTest
+otapTest: otapTest.c $(CORE)/dmr/otap.c $(CORE)/dmr/otap.h $(CORE)/crypto/sha256.c
+	$(CC) $(CFLAGS) -Wshadow -o $@ otapTest.c $(CORE)/dmr/otap.c $(CORE)/crypto/sha256.c
+
+TESTS   += otapSvcTest
+otapSvcTest: otapSvcTest.c $(CORE)/dmr/otapSvc.c $(CORE)/dmr/otap.c $(CORE)/dmr/otap_api.h $(CORE)/crypto/sha256.c
+	$(CC) $(CFLAGS) -Wshadow -DCONFIG_OTAP=1 -o $@ otapSvcTest.c $(CORE)/dmr/otapSvc.c $(CORE)/dmr/otap.c $(CORE)/crypto/sha256.c
+
+
 # The single frequency repeater's generic logic (with BPTC for the idle message)
 SFRSRC  := sfrTest.c $(CORE)/dmr/sfr.c $(DATA) $(FRAME)
 
@@ -128,6 +137,8 @@ run: $(TESTS)
 	./hotspotDataTest
 	./hotspotUplinkTest
 	./dmrPrivacyTest
+	./otapTest
+	./otapSvcTest
 	./lrrpTest
 	./airQueueTest
 	./zoneShareTest
@@ -168,7 +179,7 @@ RFEAT   := $(CORE)/radio/scan.c $(CORE)/radio/beep.c $(CORE)/radio/battery.c $(C
            $(CORE)/radio/radio_sfr.c $(CORE)/radio/radio_cwid.c
 RCORE   := radioCoreTest.c $(CORE)/radio/radio_sm.c $(CORE)/radio/tones.c $(RFEAT) $(CORE)/dmr/call/dmr_call.c \
            $(CORE)/dmr/call/dmr_lc.c $(CORE)/dmr/fec/dmrFec.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/dmr/ambe/ambeFec.c \
-           $(CORE)/dmr/dmrPrivacy.c sim/dmr_sim_modem.c $(CORE)/dmr/dmrData.c $(CORE)/dmr/dmrDataService.c \
+           $(CORE)/dmr/dmrPrivacy.c $(CORE)/dmr/otap.c $(CORE)/dmr/otapSvc.c $(CORE)/crypto/sha256.c sim/dmr_sim_modem.c $(CORE)/dmr/dmrData.c $(CORE)/dmr/dmrDataService.c \
            $(CORE)/dmr/dmrLrrp.c $(CORE)/dmr/dmr_emergency.c $(CORE)/radio/morse.c $(CORE)/dmr/zoneShare.c $(CORE)/dmr/zoneShareSvc.c $(CORE)/dmr/dmrAirQueue.c \
            $(CORE)/settings/settings.c $(CORE)/storage/storage.c \
            $(CORE)/radio/radio_hotspot.c $(CORE)/hotspot/mmdvm.c $(CORE)/hotspot/hotspot.c \
@@ -192,7 +203,7 @@ radioCoreTestNoVfoDmr: $(RCORE) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)
 TESTS   += radioFeaturesTest
 RFTEST  := radioFeaturesTest.c $(CORE)/radio/radio_sm.c $(CORE)/radio/tones.c $(RFEAT) $(CORE)/dmr/call/dmr_call.c \
            $(CORE)/dmr/call/dmr_lc.c $(CORE)/dmr/fec/dmrFec.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/dmr/ambe/ambeFec.c \
-           $(CORE)/dmr/dmrPrivacy.c sim/dmr_sim_modem.c $(CORE)/dmr/dmrData.c $(CORE)/dmr/dmrDataService.c \
+           $(CORE)/dmr/dmrPrivacy.c $(CORE)/dmr/otap.c $(CORE)/dmr/otapSvc.c $(CORE)/crypto/sha256.c sim/dmr_sim_modem.c $(CORE)/dmr/dmrData.c $(CORE)/dmr/dmrDataService.c \
            $(CORE)/dmr/dmrLrrp.c $(CORE)/dmr/dmr_emergency.c $(CORE)/radio/morse.c $(CORE)/dmr/zoneShare.c $(CORE)/dmr/zoneShareSvc.c $(CORE)/dmr/dmrAirQueue.c \
            $(CORE)/settings/settings.c $(CORE)/storage/storage.c $(CORE)/usbaudio/audio_mux.c \
            $(CORE)/usbaudio/pcm_slip.c $(CORE)/dmr/sfrRunner.c $(CORE)/dmr/sfr.c

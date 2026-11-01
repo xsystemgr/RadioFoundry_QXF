@@ -109,6 +109,8 @@ All multi-byte numbers are little endian. Text is ASCII, lines end with `\n`.
 | `0x1B` | CRASH | operation u8 + arguments (3.19); `CONFIG_CRASH_LOG` builds, else status 4 | none (3.19) |
 | `0x1C` | CODEPLUG | operation u8 + arguments (3.20); `CONFIG_CPS_FAST` builds, else status 4 | layout, block sums, an LZ4 stream, or a reason (3.20) |
 | `0x1D` | WATCHDOG | operation u8 + arguments (3.21); `CONFIG_WATCHDOG` builds, else status 4 | none (3.21) |
+| `0x1E` | RX2 | operation u8 + arguments (3.22) | flags, or a reason (3.22) |
+| `0x1F` | OTAP | operation u8 + arguments (3.23); `CONFIG_OTAP` builds, else status 4 | info, a reply message, or none (3.23) |
 
 ### 3.1 VERSION
 
@@ -661,6 +663,24 @@ The token is `'BRDG'` (`0x47445242`, little endian in the payload); another valu
 answered refused (7). The bridge is dropped if PTT went down between the reply and its start.
 `rfoundry_debug.py rx2 [info|restart]`; `stubtool.py --board gd88b` uses BRIDGE.
 
+### 3.23 OTAP
+
+Fleet administration ([otap.md](otap.md)). `CONFIG_OTAP` builds, else every op answers `DL_ST_UNAVAILABLE`. IDs are
+u24 big endian, as on the air.
+
+| Op | Name | Arguments | Reply / effect |
+|---|---|---|---|
+| 0 | INFO | none | flags u8, counter u32, admin0 u24, admin1 u24, secret_set u8 |
+| 1 | SECRET | 32 octets (or 0 to clear) | sets this radio's shared secret and resets its counter; never read back |
+| 2 | FLAGS | u8 (`SETTINGS_OTAP_*`) | what a signed command may do to this radio |
+| 3 | ADMIN | index u8 (0/1), id u24 | an admin DMR ID allowed to command this radio (0 = unused) |
+| 4 | SEND | a whole signed message (otap.md 3) | relays it on the air to the target ID in its header |
+| 5 | RECV | none | have u8; if 1: src u24, len u8, then the reply message waiting for us |
+
+SECRET, FLAGS and ADMIN provision this radio (they write the settings and the radio core re-reads them). SEND and
+RECV are the PC console: the PC holds the secret and builds and checks the messages, the radio only relays. The secret
+is write-only here and is never returned. `rfoundry_debug.py otap ...`, and the bench GUI's fleet tab.
+
 ## 4. Safety
 
 - PTT: a firmware time-out on every injected PTT (10 s maximum); the host tool refuses longer holds; the radio
@@ -672,6 +692,7 @@ answered refused (7). The bridge is dropped if PTT went down between the reply a
 - STUB ENTER is refused while transmitting, and the transmitter is switched to receive before the jump (3.18).
 - CRASH TEST needs its token and is refused while transmitting (3.19).
 - WATCHDOG TEST and LOAD need their token and are refused while transmitting; each ends in a reset (3.21).
+- OTAP SECRET/FLAGS/ADMIN only provision this radio over USB; the secret is never read back or sent on the air. A command on the air is obeyed only with a valid HMAC signature and a counter above the last taken (otap.md 4).
 - RX2 BRIDGE and RESTART need their token and are refused while transmitting. The bridge keeps the transmitter off
   and ends in a restart (3.22).
 - REBOOT needs the chip UID's low word as a token, is refused while transmitting, and the ROM DFU mode is refused

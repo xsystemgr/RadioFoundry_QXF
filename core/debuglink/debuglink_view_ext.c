@@ -3,8 +3,11 @@
 // The dmr_ext view section (docs/spec/debuglink.md 3.7): DMR emergency (core/dmr/dmr_emergency.h), the ETSI short
 // data counters and settings (core/dmr/dmrDataService.h) and the hotspot's CW ID (core/radio/radio_hotspot.h). Apart
 // from dmr_data so that section keeps fitting one reply.
+#include <string.h>
 #include "config.h"
+#include "hal_time.h"
 #include "debuglink/debuglink.h"
+#include "settings/settings.h"
 #if CONFIG_DMR_DATA_CORE
 #include "dmr/dmr_data_api.h"
 #endif
@@ -31,6 +34,21 @@ static const char *em_mode_key(uint8_t m)
 
 void debuglink_view_dmr_ext(dl_text_t *t)
 {
+#if CONFIG_DMR_PRIVACY
+	// The privacy bands (settings_t.privacy_band): "lo-hi" in kHz, the unused ones left out
+	{
+		uint32_t b[SETTINGS_PRIVACY_BANDS][2];
+		const settings_t *st = settings_begin();
+
+		memcpy(b, st->privacy_band, sizeof b);
+		settings_end(hal_millis());	// nothing changed: nothing to save
+		for (unsigned i = 0; i < SETTINGS_PRIVACY_BANDS; i++) {
+			if (b[i][0] != 0) {
+				dl_text(t, "privacy.band%u=%lu-%lu\n", i, (unsigned long)b[i][0], (unsigned long)b[i][1]);
+			}
+		}
+	}
+#endif
 #if CONFIG_DMR_DATA_CORE
 	dmrDataStats_t s;
 	dmrDataSettings_t set;

@@ -151,7 +151,8 @@ typedef struct {
 	bool reply_active;
 	uint8_t reply_s;	// reply window seconds left
 	bool target_manual;	// a talk target chosen for now (contact, typed ID, call back), until the channel changes
-	bool privacy;		// a privacy key is loaded: encrypted calls play, our calls go out encrypted
+	bool privacy;		// a privacy key is loaded: encrypted calls play, our calls go out encrypted (privacy_tx)
+	bool privacy_tx;	// ... here: the transmit frequency is inside a privacy band (settings_t.privacy_band)
 	bool alias_tx;		// our talker alias goes out on this channel
 	bool hear_all;		// every talkgroup on our slot: MONITOR held, or the hear all latch
 	bool hear_all_latch;	// hear all latched (radio_req_dmr_hear_all), until the channel changes

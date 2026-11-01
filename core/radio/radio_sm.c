@@ -59,6 +59,10 @@ static void cw_cancel(radio_sm_t *sm);
 #if CONFIG_ZONE_SHARE
 #include "dmr/zone_share_api.h"
 #endif
+#if CONFIG_OTAP
+#include "dmr/otap_api.h"		// fleet administration over DMR data (docs/spec/otap.md)
+#include "crypto/sha256.h"		// crypto_wipe
+#endif
 #if CONFIG_AM_RX
 #include "radio/radio_am.h"	// air band AM receive (docs/spec/airband-and-broadcast.md 3)
 #endif
@@ -960,6 +964,15 @@ static void dmr_load_channel(radio_sm_t *sm)
 
 #if CONFIG_DMR_PRIVACY
 static dmrPrivacyKey_t privacy_key;	// the call stack's privacy hook context (radio task only)
+
+// Whether a transmit frequency is inside one of the settings' privacy bands
+static bool privacy_tx_allowed(uint32_t hz)
+{
+	const settings_t *st = settings_begin();
+	bool ok = dmrPrivacyBandAllowed((const uint32_t (*)[2])st->privacy_band, SETTINGS_PRIVACY_BANDS, hz);
+	settings_end(0);	// read only: nothing changed, so the time isn't used
+	return ok;
+}
 #endif
 
 // Hang time (ms) as the call stack's reply window (whole seconds, rounded up); 0 keeps the stack's default
@@ -1027,14 +1040,22 @@ static void dmr_configure(radio_sm_t *sm)
 	bool privacy = false;
 #if CONFIG_DMR_PRIVACY
 	privacy = sm->privacy_type != DMR_PRIVACY_OFF;
+	bool privacy_tx = false;
 	if (privacy) {
+		// Our calls go out encrypted only inside the privacy bands (settings_t.privacy_band); a key still decrypts
+		// what is heard anywhere
+		privacy_tx = privacy_tx_allowed(ch->tx_hz != 0 ? ch->tx_hz : ch->rx_hz);
 		privacy_key.type = (dmrPrivacyType_t)sm->privacy_type;
 		privacy_key.key = sm->privacy_key;
+		privacy_key.txOff = !privacy_tx;
 		cfg.privacy = dmrPrivacyCallHook;
 		cfg.privacy_ctx = &privacy_key;
-		cfg.tx_fid = dmrPrivacyFID(privacy_key.type, cfg.tx_fid);
-		cfg.tx_svc = dmrPrivacyServiceOptions(privacy_key.type, cfg.tx_svc);
+		if (privacy_tx) {
+			cfg.tx_fid = dmrPrivacyFID(privacy_key.type, cfg.tx_fid);
+			cfg.tx_svc = dmrPrivacyServiceOptions(privacy_key.type, cfg.tx_svc);
+		}
 	}
+	sm->view.dmr.privacy_tx = privacy_tx;
 #endif
 #if CONFIG_DMR_EMERGENCY
 	// In emergency: every call carries the emergency service option, goes to the emergency target, and doesn't wait
@@ -1881,6 +1902,156 @@ static void emergency_tick(radio_sm_t *sm, uint32_t now_ms)
 }
 #endif
 
+
+#if CONFIG_OTAP
+// Fleet admin (docs/spec/otap.md): the shared secret, counter, allowed admins and policy come from the settings
+static void otap_load_config(const settings_t *st)
+{
+	otap_config_t cfg;
+	memcpy(cfg.secret, st->otap_secret, sizeof cfg.secret);
+	cfg.counter = st->otap_counter;
+	cfg.admin[0] = st->otap_admin[0] & 0xFFFFFFu;
+	cfg.admin[1] = st->otap_admin[1] & 0xFFFFFFu;
+	cfg.flags = 0;
+	if (st->otap_flags & SETTINGS_OTAP_SETTINGS) cfg.flags |= OTAP_ALLOW_SETTINGS;
+	if (st->otap_flags & SETTINGS_OTAP_KEYS)     cfg.flags |= OTAP_ALLOW_KEYS;
+	otap_set_config(&cfg);
+	crypto_wipe(&cfg, sizeof cfg);
+}
+
+// What a signed command is allowed to do here (the policy the user set over USB), beyond the service's own
+// authentication and replay checks
+static uint8_t otap_policy(void)
+{
+	const settings_t *st = settings_begin();
+	uint8_t f = st->otap_flags;
+	settings_end(0);
+	return f;
+}
+
+// Our state for a STATUS reply (otap.h): flags, rx/tx Hz, talk target, RX TG, battery mV, channel number, privacy type
+static uint8_t otap_status(radio_sm_t *sm, uint8_t *out)
+{
+	const channel_t *ch = &sm->view.ch;
+	uint8_t f = 0;
+	if (sm->view.dmr.active) f |= OTAP_ST_DMR;
+	if (sm->view.vfo)        f |= OTAP_ST_VFO;
+	if (sm->view.dmr.privacy) f |= OTAP_ST_PRIVACY;
+	if (sm->view.dmr.privacy_tx) f |= OTAP_ST_PRIVACY_TX;
+	uint8_t pol = otap_policy();
+	if (pol & SETTINGS_OTAP_SETTINGS) f |= OTAP_ST_SETTINGS;
+	if (pol & SETTINGS_OTAP_KEYS)     f |= OTAP_ST_OTAR;
+	uint32_t tg = sm->talk_private ? 0 : sm->talk_id;
+	out[0] = f;
+	out[1]=(uint8_t)(ch->rx_hz>>24); out[2]=(uint8_t)(ch->rx_hz>>16); out[3]=(uint8_t)(ch->rx_hz>>8); out[4]=(uint8_t)ch->rx_hz;
+	out[5]=(uint8_t)(ch->tx_hz>>24); out[6]=(uint8_t)(ch->tx_hz>>16); out[7]=(uint8_t)(ch->tx_hz>>8); out[8]=(uint8_t)ch->tx_hz;
+	out[9]=(uint8_t)(tg>>16); out[10]=(uint8_t)(tg>>8); out[11]=(uint8_t)tg;
+	uint32_t rxtg = sm->view.dmr.rx_tg;
+	out[12]=(uint8_t)(rxtg>>16); out[13]=(uint8_t)(rxtg>>8); out[14]=(uint8_t)rxtg;
+	out[15]=(uint8_t)(sm->view.battery_mv>>8); out[16]=(uint8_t)sm->view.battery_mv;
+	out[17]=(uint8_t)(sm->view.channel_number>>8); out[18]=(uint8_t)sm->view.channel_number;
+	out[19]=(uint8_t)sm->privacy_type;
+	out[20]=0;
+	return OTAP_STATUS_LEN;
+}
+
+static void otap_persist_counter(uint32_t now_ms)
+{
+	uint32_t c = otap_counter();
+	settings_t *st = settings_begin();
+	if (st->otap_counter != c) {
+		st->otap_counter = c;
+	}
+	settings_end(now_ms);
+}
+
+// Run one accepted command on the radio and answer it (docs/spec/otap.md 4)
+static void otap_run_pending(radio_sm_t *sm, uint32_t now_ms)
+{
+	otap_request_t r;
+	if (!otap_take(&r))
+		return;
+	otap_persist_counter(now_ms);		// a replay can't win after a reboot
+
+	uint8_t status[OTAP_STATUS_LEN];
+	uint8_t result = OTAP_R_OK;
+	uint8_t data_len = 0;
+	const uint8_t *data = NULL;
+	uint8_t pol = otap_policy();
+	radio_req_t rq;
+
+	switch (r.cmd) {
+	case OTAP_CMD_STATUS:
+		data_len = otap_status(sm, status);
+		data = status;
+		break;
+	case OTAP_CMD_TALK_TG:
+		if (!(pol & SETTINGS_OTAP_SETTINGS)) { result = OTAP_R_REFUSED; break; }
+		if (r.len != 3) { result = OTAP_R_BAD_ARG; break; }
+		rq = (radio_req_t){ .type = RREQ_DMR_TARGET,
+			.arg = (int32_t)(((uint32_t)r.payload[0]<<16)|((uint32_t)r.payload[1]<<8)|r.payload[2]) };
+		radio_sm_request(sm, &rq, now_ms);
+		break;
+	case OTAP_CMD_RX_TG:
+		if (!(pol & SETTINGS_OTAP_SETTINGS)) { result = OTAP_R_REFUSED; break; }
+		if (r.len != 3) { result = OTAP_R_BAD_ARG; break; }
+		rq = (radio_req_t){ .type = RREQ_DMR_RX_TG,
+			.arg = (int32_t)(((uint32_t)r.payload[0]<<16)|((uint32_t)r.payload[1]<<8)|r.payload[2]) };
+		radio_sm_request(sm, &rq, now_ms);
+		break;
+	case OTAP_CMD_ZONE_POS:
+		if (!(pol & SETTINGS_OTAP_SETTINGS)) { result = OTAP_R_REFUSED; break; }
+		if (r.len != 2) { result = OTAP_R_BAD_ARG; break; }
+		rq = (radio_req_t){ .type = RREQ_ZONE_POS, .arg = (int32_t)(((uint32_t)r.payload[0]<<8)|r.payload[1]) };
+		radio_sm_request(sm, &rq, now_ms);
+		break;
+	case OTAP_CMD_PRIVACY:
+		if (!(pol & SETTINGS_OTAP_KEYS)) { result = OTAP_R_REFUSED; break; }
+		if (r.len != 1) { result = OTAP_R_BAD_ARG; break; }
+		if (r.payload[0]) {
+			settings_t *st = settings_begin();
+			uint8_t type = st->privacy_type[0];
+			uint16_t key = (uint16_t)st->privacy_key[0];
+			settings_end(0);
+			rq = (radio_req_t){ .type = RREQ_DMR_PRIVACY, .arg = (int32_t)(((uint32_t)type<<16)|key) };
+		} else {
+			rq = (radio_req_t){ .type = RREQ_DMR_PRIVACY, .arg = 0 };
+		}
+		radio_sm_request(sm, &rq, now_ms);
+		break;
+	case OTAP_CMD_SET_KEY: {
+		if (!(pol & SETTINGS_OTAP_KEYS)) { result = OTAP_R_REFUSED; break; }
+		if (r.len != 4) { result = OTAP_R_BAD_ARG; break; }
+		uint8_t type = r.payload[0];
+		uint16_t key = (uint16_t)((r.payload[1]<<8)|r.payload[2]);
+		uint8_t activate = r.payload[3];
+		if (type >= DMR_PRIVACY_NUM_TYPES || (type != DMR_PRIVACY_OFF && !dmrPrivacyKeyIsValid(type, key))) {
+			result = OTAP_R_BAD_ARG; break;
+		}
+		// A key change only inside the privacy bands: the fleet uses it where encryption is allowed
+		const channel_t *ch = &sm->view.ch;
+		if (type != DMR_PRIVACY_OFF && !privacy_tx_allowed(ch->tx_hz != 0 ? ch->tx_hz : ch->rx_hz)) {
+			result = OTAP_R_BAND; break;
+		}
+		settings_t *st = settings_begin();
+		st->privacy_type[0] = type;
+		st->privacy_key[0] = key;
+		settings_end(now_ms);
+		if (activate) {
+			rq = (radio_req_t){ .type = RREQ_DMR_PRIVACY, .arg = (int32_t)(((uint32_t)type<<16)|key) };
+			radio_sm_request(sm, &rq, now_ms);
+		}
+		crypto_wipe(r.payload, sizeof r.payload);
+		break;
+	}
+	default:
+		result = OTAP_R_UNKNOWN;
+		break;
+	}
+	otap_answer(&r, result, data, data_len);
+}
+#endif
+
 static void data_init(radio_sm_t *sm)
 {
 	dmrDataEnv_t env = { .txStart = data_tx_start, .channelClear = data_channel_clear,
@@ -1929,6 +2100,11 @@ static void data_init(radio_sm_t *sm)
 	zone_share_set_offers(st->zs_offers);	// Off unless the user chose Ask (docs/spec/zone-share.md 5)
 #endif
 	dmr_call_set_data_rx(data_rx, NULL);
+#if CONFIG_OTAP
+	otap_init();
+	dmrDataServiceSetOtapHook(otap_rx);
+	otap_load_config(st);
+#endif
 #if CONFIG_DMR_EMERGENCY
 	emergency_init(st);
 #endif
@@ -1962,6 +2138,10 @@ static void data_tick(radio_sm_t *sm, uint32_t now_ms)
 #endif
 #if CONFIG_ZONE_SHARE
 	zone_share_tick(now_ms);
+#endif
+#if CONFIG_OTAP
+	otap_tick(sm->view.dmr.own_id, data_can_send(sm), now_ms);
+	otap_run_pending(sm, now_ms);
 #endif
 	data_save_settings(now_ms);
 	if (sm->power_off_req && sm->power_off_busy) {
@@ -4633,6 +4813,9 @@ static void reload(radio_sm_t *sm, uint32_t now_ms)
 	}
 #endif
 	apply_prefs(sm, st);
+#if CONFIG_OTAP
+	otap_load_config(st);	// a new secret, admin list or policy set over USB
+#endif
 	radio_settings_t rs;
 	settings_to_radio(st, &rs);
 	use_settings(sm, &rs, now_ms);

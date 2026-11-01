@@ -1557,7 +1557,7 @@ static void test_private_calls(void)
 // the encoder's frames back, one without it never plays them
 static void test_basic_privacy(void)
 {
-	static dmrPrivacyKey_t key = { DMR_PRIVACY_MOTOROLA_BP, 7 };
+	static dmrPrivacyKey_t key = { DMR_PRIVACY_MOTOROLA_BP, 7, false };
 	dmr_call_config_t c = base_cfg();
 
 	c.privacy = dmrPrivacyCallHook;

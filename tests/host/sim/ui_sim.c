@@ -1370,6 +1370,7 @@ bool ui_svc_hear_all(bool on)
 bool ui_svc_privacy(bool on)
 {
 	view.dmr.privacy = on && view.dmr.active;
+	view.dmr.privacy_tx = view.dmr.privacy;
 	changed();
 	return view.dmr.privacy == on;
 }

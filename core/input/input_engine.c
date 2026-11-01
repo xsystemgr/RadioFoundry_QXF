@@ -54,6 +54,24 @@ void input_engine_step(input_engine_t *e, uint32_t raw, int8_t enc, uint32_t now
 	}
 	e->held = held;
 	held &= ~e->ignore;
+	// Panic wipe: the '*' and '#' keys held together for INPUT_ZEROIZE_MS send ACT_ZEROIZE once (the UI wipes
+	// everything). The 10 s hold is itself the confirmation, so there is no other gate
+	uint32_t star = 0, hash = 0;
+	for (uint8_t i = 0; i < e->keymap_len; i++) {
+		if (e->keymap[i].dtmf == '*' && e->keymap[i].bit < 32) star |= 1u << e->keymap[i].bit;
+		if (e->keymap[i].dtmf == '#' && e->keymap[i].bit < 32) hash |= 1u << e->keymap[i].bit;
+	}
+	if (star != 0 && hash != 0 && (held & star) && (held & hash)) {
+		if (e->combo_t_down == 0) {
+			e->combo_t_down = now_ms ? now_ms : 1;
+		} else if (!e->combo_done && (now_ms - e->combo_t_down) >= INPUT_ZEROIZE_MS) {
+			e->combo_done = true;
+			send(emit, ctx, ACT_ZEROIZE, GESTURE_LONG, 0);
+		}
+	} else {
+		e->combo_t_down = 0;
+		e->combo_done = false;
+	}
 	uint32_t long_ms = e->long_ms != 0 ? e->long_ms : INPUT_LONG_MS;
 	uint32_t repeat_ms = e->repeat_ms != 0 ? e->repeat_ms : INPUT_REPEAT_MS;
 

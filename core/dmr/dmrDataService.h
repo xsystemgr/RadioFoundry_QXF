@@ -296,6 +296,11 @@ bool dmrDataServiceEmergencyAlarmBusy(void);
 // The 10 octets of an emergency alarm CSBK (docs/spec/dmr-emergency.md 2)
 void dmrDataBuildEmergencyAlarm(uint32_t dst, uint32_t src, bool group, uint8_t fid, uint8_t out[10]);
 
+// Fleet admin (CONFIG_OTAP, core/dmr/otapSvc.c): a UDP datagram to OTAP_PORT for us, not left to the PC, handed to
+// the hook with our DMR ID on this channel. Set after dmrDataServiceInit (NULL: none)
+typedef void (*dmrDataOtapHook_t)(uint32_t src, bool group, uint32_t ownId, const uint8_t *payload, int length);
+void dmrDataServiceSetOtapHook(dmrDataOtapHook_t hook);
+
 // Zone share (CONFIG_ZONE_SHARE): a UDP datagram to ZS_PORT for us (or a group we listen to), not left to the PC.
 // zoneShareSvc.c has it
 void dmrDataServiceZoneShareRx(uint32_t src, bool group, const uint8_t *payload, int length);

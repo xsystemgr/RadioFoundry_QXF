@@ -130,6 +130,14 @@ endif
 ifeq ($(CONFIG_DMR_PRIVACY),y)
 APP_SRC += core/dmr/dmrPrivacy.c
 endif
+# Fleet administration over DMR data (signed config / privacy-key changes to the owner's radios): the message and its
+# HMAC always with privacy, the service only with the data core (CONFIG_OTAP, docs/spec/otap.md)
+ifeq ($(CONFIG_DMR_PRIVACY),y)
+APP_SRC += core/dmr/otap.c core/crypto/sha256.c
+ifeq ($(CONFIG_DMR_DATA_CORE),y)
+APP_SRC += core/dmr/otapSvc.c
+endif
+endif
 # DMR data (SMS, ARS, LRRP, CSBK signaling)
 ifeq ($(CONFIG_DMR_DATA_CORE),y)
 APP_SRC += core/dmr/dmrData.c core/dmr/dmrDataService.c core/dmr/dmrLrrp.c

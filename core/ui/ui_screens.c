@@ -1250,8 +1250,10 @@ static void draw_chips_dmr(const radio_view_t *v, const ui_state_t *s)
 		if (x + (int)strlen(buf) * f->w <= gfx_width())
 			x = gfx_text(f, x, L->chips_y, buf, ui_col.fg) + f->w;
 	}
-	if ((s->privacy || v->dmr.privacy) && x + 4 * f->w <= gfx_width())
-		gfx_text(f, x, L->chips_y, "Priv", ui_col.priv);
+	// Outside the privacy bands the key only decrypts: "PrivRX", our calls go out in the clear
+	bool priv_rx = v->dmr.privacy && !v->dmr.privacy_tx;
+	if ((s->privacy || v->dmr.privacy) && x + (priv_rx ? 6 : 4) * f->w <= gfx_width())
+		gfx_text(f, x, L->chips_y, priv_rx ? "PrivRX" : "Priv", priv_rx ? ui_col.warn : ui_col.priv);
 }
 
 // Activity on Home, DMR idle: the last call heard. Two lines where they fit (the caller, then where and when), else
@@ -1351,7 +1353,7 @@ static void draw_dmr_call(const radio_view_t *v, const ui_state_t *s)
 		if (d->rmo)
 			sb_str(&b, " RPT");
 		if (d->privacy)
-			sb_str(&b, " ENC");
+			sb_str(&b, d->privacy_tx ? " ENC" : " CLEAR");	// outside the privacy bands: not encrypted
 		y = call_line(L->small, y, buf, ui_col.dim);
 		sb_init(&b, buf, sizeof buf);
 		sb_mmss(&b, v->tx_elapsed_ms / 1000u);

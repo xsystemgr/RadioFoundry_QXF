@@ -11,7 +11,8 @@
 
 #define INPUT_SCAN_MS		10
 #define INPUT_KEYS_MAX		32	// key map entries handled (key bits are 0..31)
-#define INPUT_HOLD_MS		1500	// hold-to-activate: a key whose long action is EMERGENCY gives it only after this
+#define INPUT_HOLD_MS		1500
+#define INPUT_ZEROIZE_MS	10000	// * and # held together this long: ACT_ZEROIZE (wipe everything)	// hold-to-activate: a key whose long action is EMERGENCY gives it only after this
 					// (or the long press time, if longer; docs/ux/principles.md P7)
 
 // The hold time that gives a key's long action
@@ -59,6 +60,8 @@ typedef struct {
 	input_dtmf_t dtmf;	// DTMF keys' edges (NULL = none)
 	void *dtmf_ctx;
 	input_key_t keys[INPUT_KEYS_MAX];
+	uint32_t combo_t_down;	// when * and # first seen held together (0 = not now)
+	bool combo_done;	// ACT_ZEROIZE already sent for this hold
 } input_engine_t;
 
 // Injected keys (the debug link's KEY): held until a time, then released by a later scan. The hold and the gap after

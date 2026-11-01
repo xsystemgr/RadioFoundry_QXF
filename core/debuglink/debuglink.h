@@ -73,6 +73,7 @@ enum {
 	DL_OP_VOICE_TEST = 33,
 	DL_OP_DTMF = 34,
 	DL_OP_DMR_RX_TG = 35,	// talkgroup u32 LE (24 bits, 0 = none): radio_req_dmr_rx_tg
+	DL_OP_PRIVACY_BAND = 36,	// index u8 (0-7), lo kHz u32 LE, hi kHz u32 LE (lo 0: unused): saved, applied at once
 };
 uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *args, uint16_t len);
 // RADIO ops the dispatcher hands to debuglink_radio_feature_op: a new DL_OP_* goes here too
@@ -80,7 +81,7 @@ static inline bool debuglink_is_feature_op(uint8_t op)
 {
 	return (op >= DL_OP_SCAN && op <= DL_OP_SETTING) || op == DL_OP_ROAM || op == DL_OP_VIBRATE || op == DL_OP_VOLUME ||
 	       op == DL_OP_DMR_FIELDS || op == DL_OP_VFO_COPY || op == DL_OP_VOICE_TEST || op == DL_OP_DTMF ||
-	       op == DL_OP_DMR_RX_TG;
+	       op == DL_OP_DMR_RX_TG || op == DL_OP_PRIVACY_BAND;
 }
 // VERSION's codec= (hal_vocoder_id; the name the host tests use)
 static inline const char *debuglink_codec_id(const hal_vocoder_t *v)
@@ -135,6 +136,9 @@ void debuglink_crash_service(void);
 // the update bridge after the reply has gone out. A board without board.rx2 answers INFO with no flags, the rest
 // unavailable
 size_t debuglink_cmd_rx2(const uint8_t *req, uint16_t len, uint8_t *out, size_t cap);
+
+// Fleet administration (debuglink_otap.c, docs/spec/debuglink.md 3.23): DL_CMD_OTAP
+size_t debuglink_cmd_otap(const uint8_t *req, uint16_t len, uint8_t *out, size_t cap);
 void debuglink_rx2_service(void);
 
 // The hardware watchdog (debuglink_watchdog.c, docs/spec/debuglink.md 3.21): the watchdog section, DL_CMD_WATCHDOG's

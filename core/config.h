@@ -266,6 +266,12 @@
 #define CONFIG_DMR_DATA_CORE		(CONFIG_DMR_SMS || CONFIG_DMR_ARS || CONFIG_DMR_LRRP || CONFIG_DMR_SIGNALING || \
 					 CONFIG_DMR_EMERGENCY || CONFIG_DMR_IP_GATEWAY || CONFIG_ZONE_SHARE || CONFIG_CRASH_REPORT)
 #endif
+// Fleet administration over DMR data (core/dmr/otapSvc.c, docs/spec/otap.md): signed config / privacy-key changes to
+// the owner's own radios. Needs privacy (it manages the privacy key) and the data core; so the amateur variant, which
+// drops privacy, drops this too
+#ifndef CONFIG_OTAP
+#define CONFIG_OTAP			(CONFIG_DMR_PRIVACY && CONFIG_DMR_DATA_CORE)
+#endif
 // The air queue (core/dmr/dmrAirQueue.c): what the IP gateway and zone sharing send, in order with the guard
 #define CONFIG_DMR_AIR_QUEUE		(CONFIG_DMR_IP_GATEWAY || CONFIG_ZONE_SHARE)
 

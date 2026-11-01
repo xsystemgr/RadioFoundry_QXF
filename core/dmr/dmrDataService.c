@@ -18,6 +18,7 @@
 #endif
 #if CONFIG_ZONE_SHARE
 #include "dmr/zoneShare.h"
+#include "dmr/otap.h"	// OTAP_PORT
 #endif
 
 #if CONFIG_DMR_DATA_CORE
@@ -66,6 +67,7 @@ static dmrDataSettings_t settings = { .callAlertAck = true, .lrrpReply = true, .
 										.ipConfirmedTries = DMR_IPC_TRIES_DEFAULT };
 static bool passthrough;				// control station: IP based packets to us belong to the PC
 static dmrDataChannel_t channel;
+static dmrDataOtapHook_t otapHook;
 static uint32_t now;
 static dmrDataStats_t stats;
 static void (*lockFn)(void);
@@ -2197,6 +2199,12 @@ static void handlePacket(const dmrDataPacket_t *packet)
 	}
 #endif
 
+	// A signed fleet admin command to us, or a reply to the PC's (docs/spec/otap.md)
+	if (!toPc && isUDP && (udp.dstPort == OTAP_PORT) && (otapHook != NULL))
+	{
+		otapHook(packet->src, packet->group, channel.ownId, udp.payload, udp.length);
+	}
+
 	// The presence server's answer to our registration, or its request for one
 	if (CONFIG_DMR_ARS && !toPc && isUDP && (udp.appPort == DMR_UDP_PORT_ARS) && !packet->group && (packet->src == ars.server) && (ars.server != 0))
 	{
@@ -2581,6 +2589,11 @@ void dmrDataServiceSetPassthrough(bool on)
 bool dmrDataServicePassthrough(void)
 {
 	return passthrough;
+}
+
+void dmrDataServiceSetOtapHook(dmrDataOtapHook_t hook)
+{
+	otapHook = hook;
 }
 
 void dmrDataServiceLock(void)

@@ -302,8 +302,22 @@ void dmrPrivacyCallHook(uint8_t *ambe27, uint8_t voiceIndex, bool tx, void *ctx)
 {
 	const dmrPrivacyKey_t *k = (const dmrPrivacyKey_t *)ctx;
 
-	if (k != NULL)
+	if ((k != NULL) && !(tx && k->txOff))
 	{
 		dmrPrivacyApplyBurst(k->type, k->key, ambe27, voiceIndex, !tx);
 	}
+}
+
+bool dmrPrivacyBandAllowed(const uint32_t bands[][2], unsigned n, uint32_t hz)
+{
+	uint32_t khz = hz / 1000u;
+
+	for (unsigned i = 0; i < n; i++)
+	{
+		if ((bands[i][0] != 0) && (khz >= bands[i][0]) && (khz <= bands[i][1]))
+		{
+			return true;
+		}
+	}
+	return false;
 }

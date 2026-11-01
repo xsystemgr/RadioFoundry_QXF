@@ -9,7 +9,7 @@ static int failures;
 static int checks;
 #define CHECK(c) do { checks++; if (!(c)) { failures++; printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); } } while (0)
 
-enum { K_OK, K_UP, K_PTT, K_MON, K_SIDE, K_TOP, K_5, K_STAR };
+enum { K_OK, K_UP, K_PTT, K_MON, K_SIDE, K_TOP, K_5, K_STAR, K_HASH };
 
 static const keymap_entry_t keymap[] = {
 	{ K_OK, ACT_SELECT, ACT_QUICK, false, false, 0 },
@@ -20,6 +20,7 @@ static const keymap_entry_t keymap[] = {
 	{ K_TOP, ACT_USER_3, ACT_EMERGENCY, false, false, 0 },
 	{ K_5, ACT_DIGIT_5, ACT_DIGIT_5, false, false, 0 },
 	{ K_STAR, ACT_QUICK, ACT_QUICK, false, false, '*' },
+	{ K_HASH, ACT_CONTEXT, ACT_CONTEXT, false, false, '#' },
 };
 
 #define MAXEV 128
@@ -343,9 +344,32 @@ static void test_inject_late_scans(void)
 	CHECK(count(ACT_SELECT, GESTURE_PRESS) == 2);
 }
 
+static void test_zeroize(void)
+{
+	// * and # held together for INPUT_ZEROIZE_MS send ACT_ZEROIZE once; neither alone does
+	reset(0);
+	keys = 1u << K_STAR;
+	run(INPUT_ZEROIZE_MS + 200, 0);
+	CHECK(count(ACT_ZEROIZE, GESTURE_LONG) == 0);
+	reset(0);
+	keys = (1u << K_STAR) | (1u << K_HASH);
+	run(INPUT_ZEROIZE_MS - 200, 0);
+	CHECK(count(ACT_ZEROIZE, GESTURE_LONG) == 0);	// not yet
+	run(400, 0);
+	CHECK(count(ACT_ZEROIZE, GESTURE_LONG) == 1);	// reached 10 s
+	run(2000, 0);
+	CHECK(count(ACT_ZEROIZE, GESTURE_LONG) == 1);	// only once per hold
+	// Releasing and holding again arms it afresh
+	keys = 0; run(100, 0);
+	keys = (1u << K_STAR) | (1u << K_HASH);
+	run(INPUT_ZEROIZE_MS + 200, 0);
+	CHECK(count(ACT_ZEROIZE, GESTURE_LONG) == 2);
+}
+
 int main(void)
 {
 	test_press();
+	test_zeroize();
 	test_bounce();
 	test_long();
 	test_emergency_hold();

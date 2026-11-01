@@ -93,6 +93,20 @@ RX2_TOKEN = 0x47445242              # 'BRDG'
 RX2_FLAGS = {1: "present", 2: "up", 4: "bridge", 8: "restart"}
 SNMP = 0x19                         # the SNMP agent (CONFIG_SNMP; docs/spec/debuglink.md 3.17, docs/spec/snmp.md)
 SNMP_OP_SET, SNMP_OP_COMMUNITY, SNMP_OP_TEST_TRAP = range(3)
+OTAP = 0x1F                         # fleet administration (CONFIG_OTAP; docs/spec/debuglink.md 3.23, docs/spec/otap.md)
+OTAP_OP_INFO, OTAP_OP_SECRET, OTAP_OP_FLAGS, OTAP_OP_ADMIN, OTAP_OP_SEND, OTAP_OP_RECV = range(6)
+OTAP_FLAG_SETTINGS, OTAP_FLAG_KEYS = 0x01, 0x02     # settings_t.otap_flags
+OTAP_PORT = 4101
+OTAP_VERSION = 1
+OTAP_HEADER, OTAP_TAG, OTAP_PAYLOAD_MAX = 15, 16, 28
+OTAP_SECRET_LEN = 32
+OTAP_REPLY = 0x80
+OTAP_CMD_STATUS, OTAP_CMD_TALK_TG, OTAP_CMD_RX_TG, OTAP_CMD_ZONE_POS = 0x01, 0x02, 0x03, 0x04
+OTAP_CMD_SET_KEY, OTAP_CMD_PRIVACY = 0x10, 0x11
+OTAP_R = {0: "ok", 1: "refused (switched off on the target)", 2: "bad argument",
+          3: "outside the target's privacy bands", 4: "failed", 5: "unknown command"}
+OTAP_PRIVACY_TYPES = {0: "off", 1: "Motorola", 2: "Anytone"}
+
 SNMP_FIELDS = {"flags": 0, "rf_manager": 1, "rf_gap_s": 2, "trap_port": 3}
 # SNMP_CFG_* bits (core/snmp/snmpMib.h)
 SNMP_FLAGS = {"off": 0x01, "rf_off": 0x02, "rf_write": 0x04, "usb_traps_off": 0x08, "auth_traps": 0x10,
@@ -980,6 +994,101 @@ class DebugLink:
             sentence = f"${body}*{c:02X}"
         self.aprs_request(APRS_OP_NMEA, sentence.encode("ascii")[:REQ_MAX - 2])
 
+    # ── fleet administration (OTAP/OTAR, docs/spec/otap.md). The PC holds the secret and builds/checks the messages;
+    #    the radio over USB relays them and holds its own copy of the secret for the commands it receives ──
+    def otap_request(self, op, args=b""):
+        return self.request(OTAP, bytes([op]) + bytes(args))[1]
+
+    def otap_info(self):
+        r = self.otap_request(OTAP_OP_INFO)
+        return {"flags": r[0], "counter": struct.unpack(">I", r[1:5])[0],
+                "admin": [int.from_bytes(r[5:8], "big"), int.from_bytes(r[8:11], "big")],
+                "secret_set": bool(r[11])}
+
+    def otap_set_secret(self, secret):
+        """32 bytes provision this radio as a fleet member; b"" clears it (service off)."""
+        if secret and len(secret) != OTAP_SECRET_LEN:
+            raise ValueError(f"the secret is {OTAP_SECRET_LEN} bytes")
+        self.otap_request(OTAP_OP_SECRET, secret)
+
+    def otap_set_flags(self, flags):
+        self.otap_request(OTAP_OP_FLAGS, bytes([flags & (OTAP_FLAG_SETTINGS | OTAP_FLAG_KEYS)]))
+
+    def otap_set_admin(self, index, dmr_id):
+        self.otap_request(OTAP_OP_ADMIN, bytes([index & 1]) + int(dmr_id).to_bytes(3, "big"))
+
+    def otap_send(self, msg):
+        """Put a whole signed message (built by otap_build) on air to its target."""
+        self.otap_request(OTAP_OP_SEND, msg)
+
+    def otap_recv(self):
+        """The next reply heard for us: (src, message) or None."""
+        r = self.otap_request(OTAP_OP_RECV)
+        if not r or r[0] == 0:
+            return None
+        src = int.from_bytes(r[1:4], "big")
+        n = r[4]
+        return src, bytes(r[5:5 + n])
+
+
+# ── OTAP/OTAR message crypto (mirrors core/dmr/otap.c; docs/spec/otap.md) ─────
+
+def otap_keys(secret):
+    """(Ka, Ke) from the 32-byte shared secret."""
+    import hmac as _hmac, hashlib
+    ka = _hmac.new(secret, b"RF-OTAP auth", hashlib.sha256).digest()
+    ke = _hmac.new(secret, b"RF-OTAP enc", hashlib.sha256).digest()
+    return ka, ke
+
+def otap_build(secret, cmd, counter, dst, src, payload=b""):
+    """A signed message; SET_KEY's payload is encrypted. Mirrors otapBuild()."""
+    import hmac as _hmac, hashlib
+    if len(payload) > OTAP_PAYLOAD_MAX:
+        raise ValueError("payload too long")
+    ka, ke = otap_keys(secret)
+    head = bytes([ord("R"), ord("A"), OTAP_VERSION, cmd]) + struct.pack(">I", counter) + \
+        int(dst).to_bytes(3, "big") + int(src).to_bytes(3, "big") + bytes([len(payload)])
+    body = bytearray(payload)
+    if cmd == OTAP_CMD_SET_KEY:
+        ks = _hmac.new(ke, head, hashlib.sha256).digest()
+        body = bytearray(b ^ ks[i] for i, b in enumerate(body))
+    msg = head + bytes(body)
+    tag = _hmac.new(ka, msg, hashlib.sha256).digest()[:OTAP_TAG]
+    return msg + tag
+
+def otap_parse(secret, msg):
+    """Verify the tag and return a dict, or None. SET_KEY payloads are decrypted."""
+    import hmac as _hmac, hashlib
+    if len(msg) < OTAP_HEADER + OTAP_TAG or msg[0:2] != b"RA" or msg[2] != OTAP_VERSION:
+        return None
+    n = msg[14]
+    if n > OTAP_PAYLOAD_MAX or len(msg) != OTAP_HEADER + n + OTAP_TAG:
+        return None
+    ka, ke = otap_keys(secret)
+    want = _hmac.new(ka, msg[:OTAP_HEADER + n], hashlib.sha256).digest()[:OTAP_TAG]
+    if not _hmac.compare_digest(want, msg[OTAP_HEADER + n:]):
+        return None
+    cmd = msg[3]
+    payload = bytearray(msg[OTAP_HEADER:OTAP_HEADER + n])
+    if (cmd & ~OTAP_REPLY) == OTAP_CMD_SET_KEY:
+        ks = _hmac.new(ke, bytes(msg[:OTAP_HEADER]), hashlib.sha256).digest()
+        payload = bytearray(b ^ ks[i] for i, b in enumerate(payload))
+    return {"cmd": cmd, "reply": bool(cmd & OTAP_REPLY), "counter": struct.unpack(">I", msg[4:8])[0],
+            "dst": int.from_bytes(msg[8:11], "big"), "src": int.from_bytes(msg[11:14], "big"),
+            "payload": bytes(payload)}
+
+def otap_status_decode(payload):
+    """The STATUS reply payload after the result byte (OTAP_STATUS_LEN) to a dict."""
+    if len(payload) < 21:
+        return {}
+    f = payload[0]
+    return {"dmr": bool(f & 0x01), "vfo": bool(f & 0x02), "privacy": bool(f & 0x04),
+            "privacy_tx": bool(f & 0x08), "otar": bool(f & 0x20), "settings": bool(f & 0x40),
+            "rx_hz": struct.unpack(">I", payload[1:5])[0], "tx_hz": struct.unpack(">I", payload[5:9])[0],
+            "talk_tg": int.from_bytes(payload[9:12], "big"), "rx_tg": int.from_bytes(payload[12:15], "big"),
+            "battery_mv": struct.unpack(">H", payload[15:17])[0],
+            "channel": struct.unpack(">H", payload[17:19])[0], "privacy_type": payload[19]}
+
 
 # ── pictures ────────────────────────────────────────────────────────────────
 
@@ -1690,6 +1799,105 @@ def cmd_watchdog(link, a):
     return 0
 
 
+def _otap_counter():
+    # A counter strictly above any the target took before: Unix seconds, bumped so repeats in one second still rise
+    import time as _t
+    now = int(_t.time())
+    last = getattr(_otap_counter, "last", 0)
+    c = now if now > last else last + 1
+    _otap_counter.last = c
+    return c
+
+def _otap_secret_arg(a):
+    if getattr(a, "random", False):
+        return os.urandom(OTAP_SECRET_LEN)
+    if a.secret:
+        h = bytes.fromhex(a.secret)
+        if len(h) != OTAP_SECRET_LEN:
+            raise SystemExit(f"--secret must be {OTAP_SECRET_LEN} bytes ({OTAP_SECRET_LEN*2} hex chars)")
+        return h
+    return None
+
+def cmd_otap(link, a):
+    if a.op == "info":
+        info = link.otap_info()
+        flags = [n for b, n in ((OTAP_FLAG_SETTINGS, "settings"), (OTAP_FLAG_KEYS, "keys")) if info["flags"] & b]
+        print(f"secret_set = {info['secret_set']}")
+        print(f"allow      = {', '.join(flags) or 'status only'}")
+        print(f"counter    = {info['counter']}")
+        print(f"admins     = {', '.join(str(x) for x in info['admin'] if x) or 'any secret holder'}")
+        return 0
+    if a.op == "provision":
+        secret = _otap_secret_arg(a)
+        if secret is None:
+            raise SystemExit("provision needs --secret HEX or --random")
+        link.otap_set_secret(secret)
+        flags = (OTAP_FLAG_SETTINGS if a.settings else 0) | (OTAP_FLAG_KEYS if a.keys else 0)
+        link.otap_set_flags(flags)
+        if a.admin0 is not None:
+            link.otap_set_admin(0, a.admin0)
+        if a.admin1 is not None:
+            link.otap_set_admin(1, a.admin1)
+        print("provisioned this radio; keep the secret safe (print it to record it):")
+        if getattr(a, "random", False):
+            print("  secret =", secret.hex())
+        return 0
+    if a.op == "off":
+        link.otap_set_secret(b"")
+        print("fleet admin off on this radio (secret cleared)")
+        return 0
+    # The commands that go on air (the PC signs them): need the fleet secret and a target ID
+    secret = _otap_secret_arg(a)
+    if secret is None:
+        raise SystemExit("this command needs --secret HEX (the fleet secret) and a target ID")
+    src = link.chip_dmr_id() if hasattr(link, "chip_dmr_id") else 0
+    try:
+        src = int(a.src) if a.src else src
+    except (TypeError, ValueError):
+        src = 0
+    target = int(a.target)
+    cmd_map = {"status": (OTAP_CMD_STATUS, b""), "talk-tg": (OTAP_CMD_TALK_TG, None),
+               "rx-tg": (OTAP_CMD_RX_TG, None), "zone": (OTAP_CMD_ZONE_POS, None),
+               "privacy": (OTAP_CMD_PRIVACY, None), "set-key": (OTAP_CMD_SET_KEY, None)}
+    cmd, payload = cmd_map[a.op]
+    if a.op in ("talk-tg", "rx-tg"):
+        payload = int(a.args[0]).to_bytes(3, "big")
+    elif a.op == "zone":
+        payload = int(a.args[0]).to_bytes(2, "big")
+    elif a.op == "privacy":
+        payload = bytes([1 if a.args and a.args[0] in ("on", "1") else 0])
+    elif a.op == "set-key":
+        # set-key TYPE KEY [activate]: TYPE 0 off / 1 Motorola / 2 Anytone
+        t = int(a.args[0]); key = int(a.args[1]); act = 1 if len(a.args) > 2 and a.args[2] in ("on", "1") else 0
+        payload = bytes([t]) + key.to_bytes(2, "big") + bytes([act])
+    msg = otap_build(secret, cmd, _otap_counter(), target, src, payload)
+    link.otap_send(msg)
+    print(f"sent {a.op} to {target}; waiting for a reply...")
+    import time as _t
+    end = _t.time() + 8
+    while _t.time() < end:
+        _t.sleep(0.3)
+        got = link.otap_recv()
+        if not got:
+            continue
+        rsrc, rmsg = got
+        m = otap_parse(secret, rmsg)
+        if not m or not m["reply"]:
+            continue
+        res = m["payload"][0] if m["payload"] else 255
+        print(f"reply from {rsrc}: {OTAP_R.get(res, res)}")
+        if (m["cmd"] & ~OTAP_REPLY) == OTAP_CMD_STATUS and res == 0:
+            st = otap_status_decode(m["payload"][1:])
+            print(f"  rx {st.get('rx_hz',0)/1e6:.4f} MHz  tx {st.get('tx_hz',0)/1e6:.4f} MHz  "
+                  f"ch {st.get('channel')}  talk TG {st.get('talk_tg')}  RX TG {st.get('rx_tg')}")
+            print(f"  privacy {OTAP_PRIVACY_TYPES.get(st.get('privacy_type'),'?')} "
+                  f"{'(tx encrypted here)' if st.get('privacy_tx') else '(rx-only here)' if st.get('privacy') else ''}  "
+                  f"battery {st.get('battery_mv',0)} mV")
+        return 0
+    print("no reply (the target may be out of range, on another channel, or not provisioned)")
+    return 1
+
+
 def cmd_reboot(link, a):
     c = link.chip()
     print_chip(c)
@@ -1754,6 +1962,18 @@ def main(argv=None):
     p.add_argument("op", choices=["status", "set", "read", "write", "trap"])
     p.add_argument("args", nargs="*", help="set: FIELD VALUE (fields " + ", ".join(SNMP_FIELDS) + "; flags as a "
                    "number or names " + ",".join(SNMP_FLAGS) + "); read / write: [COMMUNITY] (none: the default)")
+    p = sub.add_parser("otap", help="fleet administration over DMR (CONFIG_OTAP; docs/spec/otap.md). Provision this "
+                       "radio, or sign and send a command to a fleet radio")
+    p.add_argument("op", choices=["info", "provision", "off", "status", "talk-tg", "rx-tg", "zone", "privacy", "set-key"])
+    p.add_argument("target", nargs="?", help="the target radio's DMR ID (for the on-air commands)")
+    p.add_argument("args", nargs="*", help="talk-tg/rx-tg: TG; zone: POSITION; privacy: on|off; set-key: TYPE KEY [on]")
+    p.add_argument("--secret", help="the 32-byte fleet secret as 64 hex chars")
+    p.add_argument("--random", action="store_true", help="provision: make a fresh random secret and print it")
+    p.add_argument("--keys", action="store_true", help="provision: allow key changes (OTAR) on this radio")
+    p.add_argument("--settings", action="store_true", help="provision: allow setting changes on this radio")
+    p.add_argument("--admin0", type=lambda x: int(x, 0), help="provision: an admin DMR ID allowed to command this radio")
+    p.add_argument("--admin1", type=lambda x: int(x, 0), help="provision: a second admin DMR ID")
+    p.add_argument("--src", help="the sender DMR ID to put in sent commands (default: this radio's)")
     p = sub.add_parser("volume", help="speaker volume: print it, or set a step 0..volume.max / 'knob' to give the knob "
                        "back (RADIO op 30; docs/spec/debuglink.md 3.8)")
     p.add_argument("value", nargs="?", help="step 0..16 (0 mutes), or knob")
@@ -1842,6 +2062,8 @@ def main(argv=None):
                 return cmd_aprs(link, a)
             elif a.cmd == "snmp":
                 return cmd_snmp(link, a)
+            elif a.cmd == "otap":
+                return cmd_otap(link, a)
             elif a.cmd == "chip":
                 print_chip(link.chip())
             elif a.cmd == "dump":

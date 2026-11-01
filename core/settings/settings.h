@@ -26,6 +26,13 @@
 // fields it knows, the rest keep their defaults. Fixed-width members, ordered so there is no padding
 // A zone share import: which sender's zone it was, and the zone it became
 #define SETTINGS_ZS_IMPORTS	4
+#define SETTINGS_PRIVACY_BANDS	8	// privacy_band pairs
+#ifndef OTAP_SECRET_LEN
+#define OTAP_SECRET_LEN		32	// settings_t.otap_secret (docs/spec/otap.md)
+#endif
+// settings_t.otap_flags: what a signed command may do (0 = status only; a record from before reads 0)
+#define SETTINGS_OTAP_SETTINGS		0x01u	// take setting changes (talk / RX talkgroup, zone position)
+#define SETTINGS_OTAP_KEYS		0x02u	// take privacy key changes (OTAR), inside the privacy bands only
 typedef struct {
 	uint32_t key;			// hash of the sender's ID and the record's zone ID, 0 = unused
 	char zone[16];			// the zone's name here (not terminated when 16 long)
@@ -225,6 +232,20 @@ typedef struct {
 	// a 24-bit talkgroup, 0 = none. An older record reads as none
 	uint32_t vfo_rx_tg;
 	uint32_t vfo2_rx_tg;
+	// Privacy bands (appended): where our calls may go out encrypted, pairs of kHz (lo, hi), lo 0 = unused. Outside
+	// them a loaded key still decrypts what is heard, but our calls go out in the clear (dmr-voice.md, privacy bands)
+	uint32_t privacy_band[SETTINGS_PRIVACY_BANDS][2];
+	uint8_t reserved_p1end[8];	// pad so the page 2 block below starts at the page boundary (472), not straddling it
+	// Fleet admin over DMR data (CONFIG_OTAP, docs/spec/otap.md): the 32-octet shared secret all the owner's radios
+	// hold (set over USB, never on air; all zeros = the service is off), the highest request counter taken so far
+	// (replays of an older command are refused), the flags (SETTINGS_OTAP_*), and up to two DMR IDs allowed to
+	// command us (0 = unused; none set = any sender holding the secret). A record from before reads the secret as
+	// zeros, so the service stays off until the user provisions it
+	uint8_t otap_secret[OTAP_SECRET_LEN];
+	uint32_t otap_counter;
+	uint32_t otap_admin[2];
+	uint8_t otap_flags;
+	uint8_t reserved9[3];
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size

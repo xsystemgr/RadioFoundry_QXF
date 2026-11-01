@@ -104,6 +104,7 @@ void debuglink_view_dmr(uint8_t part, const radio_view_t *v, dl_text_t *t)
 			d->focus_private, d->one_shot);
 		dl_text(t, "dmr.target_manual=%u\ndmr.privacy=%u\ndmr.alias_tx=%u\n", d->target_manual, d->privacy,
 			d->alias_tx);
+		dl_text(t, "dmr.privacy_tx=%u\n", d->privacy_tx);
 		dl_text(t, "dmr.underruns=%u\n", (unsigned)d->underruns);
 		// The mic content of the latest transmission: here, not in dmr_stats, which is near the reply size
 		{

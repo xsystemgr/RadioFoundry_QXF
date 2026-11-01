@@ -2197,10 +2197,37 @@ static void test_dmr_voice_features(void)
 	CHECK(!d->privacy);
 	req(RREQ_DMR_PRIVACY, (int32_t)((1u << 16) | 7u));
 	CHECK(d->privacy);
+	// 438.5 MHz is outside the default privacy bands (amateur): the key only decrypts, our calls go in the clear
+	CHECK(!d->privacy_tx);
+	first = sim.air_count;
+	tx_once();
+	air_lc(first, &l);
+	CHECK(l.fid == 0 && l.svc == 0);
+	// Inside a band (440-470 MHz): encrypted
+	chans[4].rx_hz = chans[4].tx_hz = 446100000;
+	reload_channel();
+	CHECK(d->privacy && d->privacy_tx);
 	first = sim.air_count;
 	tx_once();
 	air_lc(first, &l);
 	CHECK(l.fid == 0x10 && l.svc == DMR_SVC_PRIVACY);
+	// A band changed to leave it out: clear again once the settings are read again
+	{
+		settings_t *st = settings_begin();
+		uint32_t keep[2] = { st->privacy_band[3][0], st->privacy_band[3][1] };
+		st->privacy_band[3][0] = 0;
+		settings_end(now);
+		req(RREQ_RELOAD, 0);
+		CHECK(d->privacy && !d->privacy_tx);
+		st = settings_begin();
+		st->privacy_band[3][0] = keep[0];
+		st->privacy_band[3][1] = keep[1];
+		settings_end(now);
+		req(RREQ_RELOAD, 0);
+		CHECK(d->privacy_tx);
+	}
+	chans[4].rx_hz = chans[4].tx_hz = 438500000;
+	reload_channel();
 	req(RREQ_DMR_PRIVACY, 0);
 	CHECK(!d->privacy);
 	first = sim.air_count;
@@ -4146,7 +4173,7 @@ static void test_factory_reset(void)
 	CHECK(settings_flush());
 	n_ev = 0;
 	CHECK(ui_svc_factory_reset());
-	sim_flash_cut_after(440);	// the settings records (page 1: 180 + 4 bytes, page 0: 252 + 4) go in, the native erase fails
+	sim_flash_cut_after(580);	// settings records (page 2: 48+4, page 1: 236+4, page 0: 236+4, each +4 commit) go in, the native erase fails
 	storage_job_poll();
 	sim_flash_power_on();
 	CHECK(n_ev == 1 && strstr(last_ev.text, "native") != NULL);

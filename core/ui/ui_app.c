@@ -1747,6 +1747,17 @@ void ui_app_key(const input_event_t *ev)
 		return;
 	if (ev->gesture == GESTURE_PRESS || ev->gesture == GESTURE_LONG)
 		ui_svc_beep(UI_BEEP_KEY);
+	// Panic wipe: * and # held together 10 s (input_engine.c). Resets every setting (the privacy keys and the fleet
+	// secret with them) and erases the codeplug, then reboots. The 10 s hold is the confirmation, so it runs at once
+	if (ev->action == ACT_ZEROIZE && ev->gesture == GESTURE_LONG) {
+		if (ui_svc_features() & UI_FEAT_FACTORY_RESET) {
+			ui_toast("Wiping everything...");
+			ui_svc_factory_reset();
+		} else {
+			ui_toast("Wipe: not in this build");
+		}
+		return;
+	}
 	if (emergency_key(ev))
 		return;
 	// Key lock: only long QUICK (and PTT, MONITOR, emergency) get through

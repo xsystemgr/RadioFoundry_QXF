@@ -56,7 +56,12 @@ typedef struct
 {
 	dmrPrivacyType_t type;
 	uint16_t key;
+	bool txOff;	// receive only: our calls go out in the clear (outside the privacy bands)
 } dmrPrivacyKey_t;
+
+// Privacy bands: pairs of kHz (lo, hi), lo 0 = unused (settings_t.privacy_band). Whether hz is inside one: only there
+// do our calls go out encrypted
+bool dmrPrivacyBandAllowed(const uint32_t bands[][2], unsigned n, uint32_t hz);
 
 // The call stack's voice privacy hook (dmr_privacy_fn, core/dmr/call/dmr_call.h): ctx is a dmrPrivacyKey_t. RX bursts
 // are FEC corrected (core/dmr/ambe/ambeFec) before the keystream is removed, TX bursts are taken as encoded
