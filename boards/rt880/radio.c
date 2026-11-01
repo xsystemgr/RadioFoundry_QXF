@@ -12,16 +12,29 @@ static bk4819_t receiver, control;
 static uint16_t receiver_id, control_id;
 static bool ready, tuned, fm = true, started;
 static uint32_t frequency;
+static bool drive_a, drive_b, audio_requested, audio_open;
+static uint8_t volume_percent = 50;
+static uint16_t af_readback, gain_readback;
+static int16_t last_rssi = -127;
+static uint8_t last_noise = 255;
 
 static void cs_a(bool high) { at32_pin_write(AT32_GPIO_C, 7, high); }
 static void clk_a(bool high) { at32_pin_write(AT32_GPIO_C, 8, high); }
-static void data_a(bool high) { at32_pin_output(AT32_GPIO_C, 6, high); }
-static void release_a(void) { at32_pin_input_floating(AT32_GPIO_C, 6); }
+static void data_a(bool high)
+{
+	if (!drive_a) { at32_pin_output(AT32_GPIO_C, 6, high); drive_a = true; }
+	else at32_pin_write(AT32_GPIO_C, 6, high);
+}
+static void release_a(void) { at32_pin_input_floating(AT32_GPIO_C, 6); drive_a = false; }
 static bool read_a(void) { return at32_pin_read(AT32_GPIO_C, 6); }
 static void cs_b(bool high) { at32_pin_write(AT32_GPIO_A, 8, high); }
 static void clk_b(bool high) { at32_pin_write(AT32_GPIO_F, 6, high); }
-static void data_b(bool high) { at32_pin_output(AT32_GPIO_C, 9, high); }
-static void release_b(void) { at32_pin_input_floating(AT32_GPIO_C, 9); }
+static void data_b(bool high)
+{
+	if (!drive_b) { at32_pin_output(AT32_GPIO_C, 9, high); drive_b = true; }
+	else at32_pin_write(AT32_GPIO_C, 9, high);
+}
+static void release_b(void) { at32_pin_input_floating(AT32_GPIO_C, 9); drive_b = false; }
 static bool read_b(void) { return at32_pin_read(AT32_GPIO_C, 9); }
 static const bk4819_bus_t bus_a = {
 	.cs = cs_a, .clk = clk_a, .data_out = data_a, .data_release = release_a, .data_in = read_a,
@@ -52,7 +65,7 @@ static void halt_frame(const bk4819_bus_t *bus, uint8_t reg)
 void rt880_rf_halt(void)
 {
 	uint32_t irq = at32_irq_save();
-	ready = tuned = false;
+	ready = tuned = audio_requested = audio_open = false;
 	at32_pin_output(AT32_GPIO_C, 4, true); // observed audio mute
 	at32_pin_output(AT32_GPIO_F, 8, false); // observed speaker gate off
 	at32_pin_output(AT32_GPIO_C, 15, false); // never HF TX
@@ -69,13 +82,29 @@ void rt880_rf_halt(void)
 	}
 	at32_irq_restore(irq);
 }
-static void audio(bool on)
+static void audio_apply(void)
 {
-	on = on && ready && tuned;
+	bool on = audio_requested && ready && tuned && volume_percent != 0;
+	audio_open = on;
 	if (!on) at32_pin_write(AT32_GPIO_C, 4, true);
 	if (ready) bk4819_set_af(&receiver, on ? BK4819_AF_FM : BK4819_AF_MUTE);
 	at32_pin_write(AT32_GPIO_F, 8, on);
 	if (on) at32_pin_write(AT32_GPIO_C, 4, false);
+	if (ready) {
+		af_readback = bk4819_read(&receiver, BK4819_REG_AF);
+		gain_readback = bk4819_read(&receiver, BK4819_REG_AF_GAIN);
+	}
+}
+static void audio(bool on)
+{
+	audio_requested = on;
+	audio_apply();
+}
+static void volume(uint8_t percent)
+{
+	volume_percent = percent > 100 ? 100 : percent;
+	if (ready) bk4819_set_af_gain(&receiver, (uint8_t)((volume_percent * 15u + 50u) / 100u));
+	audio_apply();
 }
 static uint16_t route(uint32_t hz)
 {
@@ -87,6 +116,9 @@ static void init(void)
 {
 	rt880_rf_halt();
 	started = false;
+	volume_percent = 50;
+	af_readback = gain_readback = 0;
+	drive_a = drive_b = false;
 	fm = true;
 	frequency = 0;
 	at32_pin_output(AT32_GPIO_C, 8, false);
@@ -108,6 +140,7 @@ static void init(void)
 	bk4819_analog_mode(&receiver);
 	bk4819_write(&receiver, BK4819_REG_PA, 0);
 	ready = true;
+	volume(volume_percent);
 }
 static void mode(radio_mode_t value)
 {
@@ -154,10 +187,12 @@ static void status(radio_status_t *value)
 	value->rssi_dbm = bk4819_rssi_dbm(raw);
 	value->noise = (uint8_t)(bk4819_read(&receiver, BK4819_REG_NOISE) & 0x7Fu);
 	value->tone_ok = true;
+	last_rssi = value->rssi_dbm;
+	last_noise = value->noise;
 }
 const hal_radio_t rt880_radio = {
 	.init = init, .set_mode = mode, .rx = receive, .tx = transmit,
-	.tx_off = tx_off, .status = status, .audio = audio,
+	.tx_off = tx_off, .status = status, .audio = audio, .volume = volume,
 };
 bool rt880_rf_diag(uint8_t line, char *buf, uint8_t len)
 {
@@ -165,6 +200,9 @@ bool rt880_rf_diag(uint8_t line, char *buf, uint8_t len)
 	case 0: snprintf(buf, len, "RF A:%04X B:%04X", receiver_id, control_id); break;
 	case 1: snprintf(buf, len, "RX %s / TX blocked", ready ? "ready" : "ID failed"); break;
 	case 2: snprintf(buf, len, "Tune %lu Hz", (unsigned long)frequency); break;
+	case 3: snprintf(buf, len, "AF:%04X G:%04X", af_readback, gain_readback); break;
+	case 4: snprintf(buf, len, "Audio %s V:%u", audio_open ? "OPEN" : "MUTE", volume_percent); break;
+	case 5: snprintf(buf, len, "RSSI:%d N:%u", last_rssi, last_noise); break;
 	default: return false;
 	}
 	return true;

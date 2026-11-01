@@ -4,7 +4,7 @@
 # Run from the repository root: make -f boards/rt880/Makefile
 .DEFAULT_GOAL := all
 BUILD := build/rt880-lab
-TARGET := $(BUILD)/rfoundry_rt880_rx_portrait_fix2_UNTESTED
+TARGET := $(BUILD)/rfoundry_rt880_rx_audio_fix3_UNTESTED
 ARM_GCC_DIR ?= $(firstword $(wildcard $(HOME)/opt/arm-gnu-toolchain-*-arm-none-eabi/bin/) /usr/bin/)
 CROSS ?= $(ARM_GCC_DIR)arm-none-eabi-
 CC := $(CROSS)gcc

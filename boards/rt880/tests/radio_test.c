@@ -12,7 +12,7 @@
 typedef struct {
 	bool cs, driving, reading;
 	uint32_t shift;
-	unsigned bits, read_bits, writes;
+	unsigned bits, read_bits, writes, output_setups;
 	uint16_t regs[128], id, response;
 } chip_t;
 static chip_t chips[2];
@@ -74,8 +74,8 @@ void at32_pin_write(uint32_t port, unsigned pin, bool high)
 void at32_pin_output(uint32_t port, unsigned pin, bool high)
 {
 	at32_pin_write(port, pin, high);
-	if (port == AT32_GPIO_C && pin == 6) chips[0].driving = true;
-	if (port == AT32_GPIO_C && pin == 9) chips[1].driving = true;
+	if (port == AT32_GPIO_C && pin == 6) { chips[0].driving = true; chips[0].output_setups++; }
+	if (port == AT32_GPIO_C && pin == 9) { chips[1].driving = true; chips[1].output_setups++; }
 }
 void at32_pin_input_floating(uint32_t port, unsigned pin)
 {
@@ -120,9 +120,27 @@ int main(void)
 	assert((((uint32_t)chips[0].regs[0x39] << 16) | chips[0].regs[0x38]) == 14550000);
 	rt880_radio.audio(true);
 	assert(!pins[2][4] && pins[5][8] && chips[0].regs[0x47] == BK4819_AF_FM);
+	assert(chips[0].regs[0x48] == 0xB3B8);
+	assert(rt880_radio.volume != NULL);
+	rt880_radio.volume(0);
+	assert(pins[2][4] && !pins[5][8] && chips[0].regs[0x47] == BK4819_AF_MUTE);
+	rt880_radio.volume(100);
+	assert(!pins[2][4] && pins[5][8] && chips[0].regs[0x48] == 0xB3BF);
+	rt880_radio.volume(255);
+	assert(chips[0].regs[0x48] == 0xB3BF);
+	rt880_radio.audio(false);
+	rt880_radio.volume(50);
+	assert(pins[2][4] && !pins[5][8] && chips[0].regs[0x48] == 0xB3B8);
+	rt880_radio.audio(true);
+	char diag[48];
+	assert(rt880_rf_diag(3, diag, sizeof(diag)) && strstr(diag, "AF:6140 G:B3B8"));
+	assert(rt880_rf_diag(4, diag, sizeof(diag)) && strstr(diag, "Audio OPEN V:50"));
 	chips[0].regs[0x67] = 140; chips[0].regs[0x65] = 23;
 	radio_status_t status;
+	unsigned setups = chips[0].output_setups;
 	rt880_radio.status(&status);
+	// Two reads: change direction once per command, never for each data bit.
+	assert(chips[0].output_setups - setups <= 2);
 	assert(status.rssi_dbm == -90 && status.noise == 23 && status.tone_ok);
 	assert(rt880_radio.rx(433500000, RADIO_BW_12K5, NULL));
 	assert(chips[1].regs[0x33] == 0x20 && pins[2][4] && !pins[5][8]);

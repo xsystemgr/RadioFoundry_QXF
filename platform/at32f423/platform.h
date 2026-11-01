@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define AT32_CORE_HZ 48000000u
+
 #define AT32_GPIO_A 0x40020000u
 #define AT32_GPIO_B 0x40020400u
 #define AT32_GPIO_C 0x40020800u

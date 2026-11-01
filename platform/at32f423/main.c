@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
-// Conservative HICK 8 MHz bring-up; no PLL, flash programming or RF driver.
+// HICK 48 MHz receive/UI experiment; no PLL configuration or flash programming.
 #include "platform.h"
 #include "reset_policy.h"
 #include "board.h"
@@ -49,11 +49,23 @@ static void setup(void)
 	REG(0x400238A4u) |= 3u << 4; // automatic clock stepping
 	REG(0x40023800u) |= 1u;
 	if (!wait_bits(0x40023800u, 2u, 2u)) Default_Handler();
-	REG(0x400238A0u) &= ~((1u << 12) | (1u << 14)); // fixed HICK / 6 = 8 MHz
-	REG(0x400238A4u) &= ~(7u << 16);
+	// RM 4.1.1 and 4.3.23/24: divide HICK before changing its selection.
+	// First allow any inherited supported clock; only performance bits change.
+	REG(0x40023C00u) = (REG(0x40023C00u) & ~7u) | 4u;
+	REG(0x400238A4u) = (REG(0x400238A4u) & ~(7u << 16)) | (4u << 16);
+	for (unsigned n = 0; n < 64; n++) __asm volatile("nop");
 	REG(0x40023808u) &= ~3u;
 	if (!wait_bits(0x40023808u, 12u, 0)) Default_Handler();
-	REG(0x40023808u) &= ~0xFCF0u; // AHB and both APB prescalers = 1
+	// HICKDIV must not change while a HICK-fed PLL is enabled.
+	REG(0x40023800u) &= ~(1u << 24);
+	if (!wait_bits(0x40023800u, 1u << 25, 0)) Default_Handler();
+	REG(0x400238A0u) |= 1u << 14; // HICK_TO_SCLK (register table: MISC1)
+	REG(0x400238A0u) |= 1u << 12; // HICKDIV = undivided 48 MHz
+	REG(0x40023808u) &= ~0xFCF0u; // AHB/APB1/APB2 = 1
+	REG(0x40023C00u) = (REG(0x40023C00u) & ~7u) | 1u; // 32..64 MHz
+	REG(0x400238A4u) &= ~(7u << 16); // HICK/16 -> HICK
+	__asm volatile("dsb\nisb" ::: "memory");
+	SystemCoreClock = AT32_CORE_HZ;
 	REG(0xE000EDFCu) |= 1u << 24; // enable DWT cycle counter
 	REG(0xE0001004u) = 0;
 	REG(0xE0001000u) |= 1u;
@@ -69,14 +81,14 @@ static uint64_t cycles(void)
 	__asm volatile("msr primask, %0" :: "r"(state) : "memory");
 	return result;
 }
-uint32_t hal_micros(void) { return (uint32_t)(cycles() / 8u); }
-uint32_t hal_millis(void) { return (uint32_t)(cycles() / 8000u); }
+uint32_t hal_micros(void) { return (uint32_t)(cycles() / (AT32_CORE_HZ / 1000000u)); }
+uint32_t hal_millis(void) { return (uint32_t)(cycles() / (AT32_CORE_HZ / 1000u)); }
 void hal_delay_us(uint32_t us)
 {
 	while (us) {
 		uint32_t chunk = us > 1000u ? 1000u : us;
 		uint32_t start = REG(0xE0001004u);
-		while ((uint32_t)(REG(0xE0001004u) - start) < chunk * 8u) {}
+		while ((uint32_t)(REG(0xE0001004u) - start) < chunk * (AT32_CORE_HZ / 1000000u)) {}
 		us -= chunk;
 	}
 }

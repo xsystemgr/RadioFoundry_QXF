@@ -6,9 +6,10 @@
 This target compiles the existing RadioFoundry core, UI, VFO, channel list, scan,
 settings and radio state machine with an AT32F423 platform and board HAL. VHF/UHF
 receive is implemented and model-tested. The owner confirms the first RX binary
-boots and displays the UI. The first portrait attempt is still slow, rotated
-and has a noisy strip in the owner photo. The fix2 build awaits a physical test.
-RF reception has not been physically verified. This is not a supported release. The owner waived clean-room role separation for the
+boots and displays the UI. The owner confirms fix2 displays in the correct orientation but remains slow.
+The indicator reacts to a transmitted signal, with no audible speaker output.
+Monitor has not been tried. Fix3 awaits a physical test; demodulation and audio
+remain unverified. This is not a supported release. The owner waived clean-room role separation for the
 closed experiment on November 1, 2026. No reference firmware code or tables were
 imported; the existing MIT BK4819 driver supplies the chip implementation.
 
@@ -19,7 +20,7 @@ make -f boards/rt880/Makefile -j8 image test stack-check
 ```
 
 Requirements: the pinned Arm GNU Toolchain and FreeRTOS submodule. The output is
-`build/rt880-lab/rfoundry_rt880_rx_portrait_fix2_UNTESTED.bin`. No command opens a serial port.
+`build/rt880-lab/rfoundry_rt880_rx_audio_fix3_UNTESTED.bin`. No command opens a serial port.
 The candidate image address is `0x08002800`; loader erase boundaries are unverified.
 
 ## Receive implementation
@@ -152,3 +153,42 @@ interrupts enabled and keeps the 8 MHz clock and all RF delays. The compiled
 sender model verifies all 256 byte values and takes 52 instructions per byte
 instead of the previous portrait build's 135. This is not a measured refresh
 speedup; software pixel transfer still limits full-screen updates.
+
+## Fix3: owner confirms orientation, reports no audio
+
+The owner confirms fix2 orientation appears correct. It remains slow, and the
+signal indication reacts while another radio transmits, but the speaker is
+silent. This is not yet proof of intelligible reception. Monitor was not tried.
+
+Fix3 uses the internal HICK at 48 MHz without a PLL. The startup sequence sets
+flash performance wait states, divides HICK before changing its selection,
+switches away from and disables the inherited PLL, then selects HICK48 and
+updates SystemCoreClock. DWT microseconds/milliseconds and RTOS ticks use the
+same frequency. The reference manual's register tables put HICK_TO_SCLK in
+MISC1 bit 14, despite a conflicting MISC2 name in section 4.1.1's prose.
+See [AT32F423 RM](https://www.arterychip.com/download/RM/RM_AT32F423_EN_V2.03.pdf),
+sections 4.1.1, 4.3.23, 4.3.24 and 5.8.1. Only flash read-performance bits are
+changed; no programming, erase or calibration writes occur.
+
+RF data direction is configured once after read turnaround rather than once
+per outgoing bit. Serial edge delays are retained. The LCD orientation stays
+at fix2's 0x00; the panel frame-rate register is unchanged. The expected speed
+benefit comes from CPU throughput, not an assumed panel refresh setting.
+
+A software volume hook now drives the existing BK4819 AF DAC gain helper;
+50 percent is the initial level (0x48 = 0xB3B8 rather than 0xB3B3). Zero closes
+AF and the speaker gate; restoring volume preserves the core's audio request.
+This is the core's Volume control; the physical knob ADC is still absent.
+It is a gain/control improvement, not a confirmed explanation for the silence.
+
+Diagnostics now show CPU MHz, last AF/AF-gain register readbacks, Audio OPEN or
+MUTE with volume percent, and the last RSSI/noise sample. OPEN describes the
+software's gate command, not measured amplifier output. Try Squelch 0 in Quick
+settings, with nonzero Volume. If silent, record AF, gain, Audio and RSSI/noise
+while a known FM signal is present. AF 6140 and a nonzero gain are expected
+when the core opens audio; those values alone cannot prove the external path.
+
+Native tests cover gain clamp, mute/unmute, retained audio requests, readbacks,
+and bus direction changes, while retaining the PA/TX guards. The compiled
+startup/RF model passes from reset and a modeled inherited PLL configuration.
+Physical speed, RF demodulation, speaker routing and volume need owner checks.

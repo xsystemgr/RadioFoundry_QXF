@@ -24,7 +24,7 @@ void board_init(void) {}
 static void lcd_byte(uint8_t value)
 {
 	// Lower clock and set data in one atomic write; leave all other pins alone.
-	// Unroll at the fixed 8 MHz clock; retain the RF bus delays separately.
+	// Unroll at the fixed 48 MHz clock; retain the RF bus delays separately.
 #pragma GCC unroll 8
 	for (unsigned bit = 0; bit < 8; bit++) {
 		uint32_t data = (value & 0x80u) ? (1u << 5) : (1u << 21);
@@ -158,7 +158,7 @@ static bool diag(uint8_t line, char *buf, uint8_t len)
 	case 0: snprintf(buf, len, "RX EXPERIMENT / NO TX"); break;
 	case 1: snprintf(buf, len, "Keys: %04lX", (unsigned long)last_keys); break;
 	case 2: snprintf(buf, len, "No storage writes"); break;
-	case 3: snprintf(buf, len, "MCU/PA not verified"); break;
+	case 3: snprintf(buf, len, "CPU %lu MHz", (unsigned long)(AT32_CORE_HZ / 1000000u)); break;
 	default: return rt880_rf_diag((uint8_t)(line - 4), buf, len);
 	}
 	return true;

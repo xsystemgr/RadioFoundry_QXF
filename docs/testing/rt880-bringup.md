@@ -3,7 +3,7 @@
 
 # RT-880 bring-up plan
 
-Status: the owner confirms the first RX target boots and displays a slow landscape UI. RX/audio remains unverified; the first portrait correction is still slow, rotated and noisy. Fix2 awaits testing.
+Status: fix2 orientation appears correct on the owner unit. Response remains slow; signal indication reacts but the speaker is silent. Fix3 clock/volume diagnostics await testing.
 The input facts and unknowns are in [Hardware investigation](../spec/hardware-rt880.md).
 Follow [Adding a radio](../dev/adding-a-radio.md). The owner explicitly waived the
 [clean-room role separation](../CLEANROOM.md) for the closed experiment on November 1, 2026.
@@ -121,3 +121,24 @@ The LCD byte sender combines clock-low/data writes and unrolls the bits. All
 135 in the previous portrait build. The CPU remains at 8 MHz; RF timing and
 PA/TX restrictions are unchanged. Actual responsiveness, orientation and RF
 reception still require the owner's test. Earlier sections record prior builds.
+
+## Fix3: slow response and silent speaker
+
+The owner confirms fix2 orientation appears correct, reports continued slow
+response and a signal indication when another radio transmits, with no speaker
+audio. Monitor has not been tried. Actual demodulation remains unconfirmed.
+
+Fix3 selects documented HICK48 with one flash read wait state, retaining
+calibration and updating DWT time conversions and SystemCoreClock/RTOS timing.
+It preserves the fix2 panel geometry and orientation. RF output mode is now
+configured once per turnaround instead of every bit; RF delays remain intact.
+A software Volume hook uses the existing BK4819 helper, starts at 50 percent,
+and mutes at zero. The physical knob ADC is still unimplemented.
+
+Diagnostics expose last AF/gain readbacks, commanded Audio OPEN/MUTE, volume and
+RSSI/noise. These aid the next Squelch 0/known-FM-signal test; they are not proof
+of amplifier output. Host tests and reset/inherited-PLL CPU models pass; owner
+checks of speed, audio and RF remain outstanding. Earlier sections are history.
+
+Clock source: [official AT32F423 RM 2.03](https://www.arterychip.com/download/RM/RM_AT32F423_EN_V2.03.pdf),
+sections 4.1.1, 4.3.23, 4.3.24 and 5.8.1.
