@@ -19,6 +19,10 @@ static void clock_on(uint32_t port)
 	REG(0x40023830u) |= 1u << ((port - AT32_GPIO_A) / 0x400u);
 	(void)REG(0x40023830u);
 }
+void at32_port_write(uint32_t port, uint32_t set_clear)
+{
+	REG(port + 0x18u) = set_clear;
+}
 void at32_pin_write(uint32_t port, unsigned pin, bool level)
 {
 	REG(port + 0x18u) = 1u << (pin + (level ? 0 : 16));

@@ -23,12 +23,13 @@ void board_init(void) {}
 
 static void lcd_byte(uint8_t value)
 {
+	// Lower clock and set data in one atomic write; leave all other pins alone.
+	// Unroll at the fixed 8 MHz clock; retain the RF bus delays separately.
+#pragma GCC unroll 8
 	for (unsigned bit = 0; bit < 8; bit++) {
-		at32_pin_write(AT32_GPIO_B, 3, false);
-		at32_pin_write(AT32_GPIO_B, 5, (value & 0x80u) != 0);
-		// At this target's fixed 8 MHz, the GPIO stores and loop instructions
-		// already exceed the panel's serial clock minimum periods.
-		at32_pin_write(AT32_GPIO_B, 3, true);
+		uint32_t data = (value & 0x80u) ? (1u << 5) : (1u << 21);
+		at32_port_write(AT32_GPIO_B, (1u << 19) | data);
+		at32_port_write(AT32_GPIO_B, 1u << 3);
 		value <<= 1;
 	}
 }
@@ -60,7 +61,7 @@ static const st7789_bus_t bus = {
 };
 // Portrait UI, 120x160 indexed pixels doubled to the native 240x320 panel.
 static const st7789_t panel = {
-	.bus = &bus, .width = 240, .height = 320, .madctl = 0x20, .scale = 2,
+	.bus = &bus, .width = 240, .height = 320, .madctl = 0x00, .scale = 2,
 };
 static void display_init(void)
 {

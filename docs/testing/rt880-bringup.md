@@ -3,7 +3,7 @@
 
 # RT-880 bring-up plan
 
-Status: the owner confirms the first RX target boots and displays a slow landscape UI. RX/audio remains unverified; a portrait correction is prepared.
+Status: the owner confirms the first RX target boots and displays a slow landscape UI. RX/audio remains unverified; the first portrait correction is still slow, rotated and noisy. Fix2 awaits testing.
 The input facts and unknowns are in [Hardware investigation](../spec/hardware-rt880.md).
 Follow [Adding a radio](../dev/adding-a-radio.md). The owner explicitly waived the
 [clean-room role separation](../CLEANROOM.md) for the closed experiment on November 1, 2026.
@@ -108,3 +108,16 @@ It requires a fresh physical check of orientation and responsiveness, then the
 previous RF ID/Monitor/known-signal checks. The UI simulator previews are sample
 screens, not pictures of a verified hardware run. The temporary bare-metal probe
 was discarded once the owner confirmed boot; it is not a deliverable.
+
+## Fix2 after owner photo
+
+The owner confirmed the photo is the portrait binary and reports only a slight
+speed improvement. It shows a 90-degree rotation and noisy strip. Fix2 changes
+MADCTL from 0x20 to 0x00 for the 240-column by 320-row window, clearing the axis
+exchange bit. The host serial model checks exact first/last-row bounds.
+
+The LCD byte sender combines clock-low/data writes and unrolls the bits. All
+256 bytes pass the compiled GPIO model, with 52 instructions per byte versus
+135 in the previous portrait build. The CPU remains at 8 MHz; RF timing and
+PA/TX restrictions are unchanged. Actual responsiveness, orientation and RF
+reception still require the owner's test. Earlier sections record prior builds.

@@ -6,8 +6,9 @@
 This target compiles the existing RadioFoundry core, UI, VFO, channel list, scan,
 settings and radio state machine with an AT32F423 platform and board HAL. VHF/UHF
 receive is implemented and model-tested. The owner confirms the first RX binary
-boots and displays the UI, but slowly and in landscape. RF reception and the new
-portrait build have not been physically verified. This is not a supported release. The owner waived clean-room role separation for the
+boots and displays the UI. The first portrait attempt is still slow, rotated
+and has a noisy strip in the owner photo. The fix2 build awaits a physical test.
+RF reception has not been physically verified. This is not a supported release. The owner waived clean-room role separation for the
 closed experiment on November 1, 2026. No reference firmware code or tables were
 imported; the existing MIT BK4819 driver supplies the chip implementation.
 
@@ -18,7 +19,7 @@ make -f boards/rt880/Makefile -j8 image test stack-check
 ```
 
 Requirements: the pinned Arm GNU Toolchain and FreeRTOS submodule. The output is
-`build/rt880-lab/rfoundry_rt880_rx_portrait_UNTESTED.bin`. No command opens a serial port.
+`build/rt880-lab/rfoundry_rt880_rx_portrait_fix2_UNTESTED.bin`. No command opens a serial port.
 The candidate image address is `0x08002800`; loader erase boundaries are unverified.
 
 ## Receive implementation
@@ -54,8 +55,9 @@ The candidate image address is `0x08002800`; loader erase boundaries are unverif
 ## Display and controls
 
 The existing ST7789 driver renders a portrait 120x160 indexed UI scaled 2x to
-240x320, with 9,600 bytes of frame buffer. MADCTL 0x20 follows the orientation
-observed in the supplied reference image. The new orientation needs owner confirmation. The backlight is on/off. Physical legends are not mapped yet:
+240x320, with 9,600 bytes of frame buffer. Fix2 uses MADCTL 0x00: bit 5 must
+be clear for this 240-column, 320-row window. The previous 0x20 exchanged the
+axes; the owner confirmed the rotated/noisy result. Fix2 needs owner confirmation. The backlight is on/off. Physical legends are not mapped yet:
 
 | Raw matrix position | Temporary RadioFoundry action |
 |---|---|
@@ -136,3 +138,17 @@ The [FM](preview/fm.png), [VFO](preview/vfo.png), [menu](preview/menu.png) and
 [settings](preview/settings.png) previews are rendered from the real UI host
 simulator. They show sample content and its full-feature menu configuration,
 not a capture from the radio or a promise that every pictured feature is enabled.
+
+## Fix2: orientation and continued slow response
+
+The owner photo is confirmed to show the first portrait binary. It is still
+rotated with a noisy strip; refresh is only slightly faster. Using a reference
+MADCTL value without matching our window dimensions was incorrect.
+
+Fix2 clears MADCTL MV and tests CASET 0..239 and RASET 318..319 for the last
+logical row. The LCD sender now combines clock-low and data into one atomic
+GPIO set/clear write and unrolls eight bits. It touches only PB3/PB5, leaves
+interrupts enabled and keeps the 8 MHz clock and all RF delays. The compiled
+sender model verifies all 256 byte values and takes 52 instructions per byte
+instead of the previous portrait build's 135. This is not a measured refresh
+speedup; software pixel transfer still limits full-screen updates.

@@ -10,8 +10,19 @@ static unsigned active_row = 99;
 static unsigned pressed = 99;
 static const unsigned rows[] = { 10, 2, 1, 0 };
 static bool pins[6][16];
+static uint8_t columns[4], lines[4];
+static unsigned parameter;
 static unsigned serial_bits, command_count, data_count, pixel_count;
 static uint8_t serial_byte, last_command, first_pixel, last_data, orientation;
+void at32_port_write(uint32_t port, uint32_t mask)
+{
+	assert((mask & ~( (1u << 3) | (1u << 5) | (1u << 19) | (1u << 21))) == 0);
+	assert((mask & (mask >> 16) & 0xFFFFu) == 0);
+	for (unsigned pin = 0; pin < 16; pin++) {
+		if (mask & (1u << (pin + 16))) at32_pin_write(port, pin, false);
+		if (mask & (1u << pin)) at32_pin_write(port, pin, true);
+	}
+}
 void at32_pin_output(uint32_t port, unsigned pin, bool level) { at32_pin_write(port, pin, level); }
 uint32_t at32_irq_save(void) { return 0; }
 void at32_irq_restore(uint32_t state) { (void)state; }
@@ -28,12 +39,15 @@ void at32_pin_write(uint32_t port, unsigned pin, bool level)
 		if (++serial_bits == 8) {
 			if (pins[2][13]) {
 				data_count++;
+				if (last_command == 0x2A) { assert(parameter < 4); columns[parameter++] = serial_byte; }
+				if (last_command == 0x2B) { assert(parameter < 4); lines[parameter++] = serial_byte; }
 				last_data = serial_byte;
 				if (last_command == 0x36) orientation = serial_byte;
 				if (last_command == 0x2C && pixel_count++ == 0) first_pixel = serial_byte;
 			} else {
 				command_count++;
 				last_command = serial_byte;
+				parameter = 0;
 			}
 			serial_bits = 0;
 		}
@@ -80,7 +94,7 @@ int main(void)
 	board_early_init();
 	board.display->init();
 	assert(serial_bits == 0 && last_command == 0x29);
-	assert(orientation == 0x20);
+	assert(orientation == 0x00);
 	assert(pins[0][15] && pins[2][7] && pins[0][8] && pins[1][12]);
 	static uint8_t frame[9600];
 	for (unsigned i = 0; i < sizeof(frame); i++) frame[i] = 0xA5;
@@ -93,10 +107,14 @@ int main(void)
 	assert(data_count == 968 && pixel_count == 960);
 	assert(first_pixel == 0x12 && last_data == 0x78 && serial_bits == 0);
 	assert(pins[0][15]);
+	assert(columns[0] == 0 && columns[1] == 0 && columns[2] == 0 && columns[3] == 239);
+	assert(lines[0] == 0 && lines[1] == 0 && lines[2] == 0 && lines[3] == 1);
 	command_count = data_count = pixel_count = 0;
 	board.display->flush_indexed(frame, palette, 159, 160);
 	assert(command_count == 3 && data_count == 968 && pixel_count == 960);
 	assert(first_pixel == 0x12 && last_data == 0x78 && pins[0][15]);
+	assert(columns[0] == 0 && columns[1] == 0 && columns[2] == 0 && columns[3] == 239);
+	assert(lines[0] == 1 && lines[1] == 62 && lines[2] == 1 && lines[3] == 63);
 	puts("board-test: TX/storage denied; matrix and serial LCD/scale/byte order passed");
 	return 0;
 }

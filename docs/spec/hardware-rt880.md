@@ -3,7 +3,7 @@
 
 # Radtel RT-880: port investigation
 
-Status: private FM receive experiment. The owner confirms UI boot with slow landscape drawing. Physical RX is not verified; a faster portrait build is prepared.
+Status: private FM receive experiment. The owner confirms UI boot with slow landscape drawing. Physical RX is not verified; the first portrait attempt remains slow and rotated with a noisy strip. Fix2 awaits testing.
 The first target is analog FM receive. Digital voice is a separate feasibility question.
 The owner's exact model suffix and PCB revision still need confirmation.
 
@@ -320,3 +320,16 @@ The new lab build uses a 120 by 160 indexed frame, 240 by 320 physical pixels at
 LCD sender are removed at the fixed 8 MHz clock; RF bus waits are retained.
 The modeled LCD byte cost drops from 559 to 135 instructions, but physical
 refresh speed and the corrected orientation await the owner's next test.
+
+## Fix2 after owner photo
+
+The owner confirmed the photo is the portrait binary and reports only a slight
+speed improvement. It shows a 90-degree rotation and noisy strip. Fix2 changes
+MADCTL from 0x20 to 0x00 for the 240-column by 320-row window, clearing the axis
+exchange bit. The host serial model checks exact first/last-row bounds.
+
+The LCD byte sender combines clock-low/data writes and unrolls the bits. All
+256 bytes pass the compiled GPIO model, with 52 instructions per byte versus
+135 in the previous portrait build. The CPU remains at 8 MHz; RF timing and
+PA/TX restrictions are unchanged. Actual responsiveness, orientation and RF
+reception still require the owner's test. Earlier sections record prior builds.
