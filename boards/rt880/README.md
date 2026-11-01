@@ -58,8 +58,8 @@ confirmation. The backlight is on/off. Physical legends are not mapped yet:
 
 | Raw matrix position | Temporary RadioFoundry action |
 |---|---|
-| 0 | Up / previous channel |
-| 1 | Down / next channel |
+| 0 | Up / channel +1 |
+| 1 | Down / channel -1 |
 | 2 | Select; hold for the existing Quick menu |
 | 3 | Back |
 | 4, held | Monitor / open squelch |
