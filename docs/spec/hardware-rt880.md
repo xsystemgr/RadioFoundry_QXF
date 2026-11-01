@@ -160,3 +160,33 @@ No actual board implementation, ELF or flashable RadioFoundry image exists yet. 
 remaining hardware blockers are external PA/power control, storage protection and a
 verified loader/recovery route. This specification is the input for independent
 implementation under the repository's clean-room role separation.
+
+
+## Band routing and loader investigation
+
+The routing helper selects the second RF bus while updating register 0x33, then restores
+the prior bus selection. Twenty-six frequency/mode cases were checked in an isolated
+emulator. PF0 is high above zero through 70 MHz and low otherwise. PC15 is high only
+in the transmit route above zero through 70 MHz. In that low-band transmit route,
+PB11 is low through 39.5 MHz and high above it. Other routes leave PB11 unchanged in
+this helper. These are software-observed levels, not identification of the external
+PA transistor, bias supply or RF switch. A board-wide safe-off implementation is still open.
+
+The author's web and desktop flashers agree on 115200 8N1 and 1024-byte data payloads.
+Each packet has an 8-bit additive checksum seeded with 0x52 for the RT-880 profile,
+0x00 for the UV-98 profile. The host sends the initial control twice and then the update
+control, expecting an ACK after each. The update control's RT-880 checksum is 0x18,
+which conflicts with an older external protocol note. Data packets contain the low
+16 bits of the file byte offset, which wraps every 64 KiB. The checked hosts do not
+send the end control described in that older note.
+
+The host source does not establish the device's erase boundaries, bootloader survival
+or readback verification. Do not send erase-stage controls as an identification probe.
+The author's RMS documentation says units with serial numbers below 300 use the
+UV-98 profile, even if branded RT-880. Confirm the unit before selecting a profile.
+
+Application recovery through the PTT-at-power-on loader is documented but untested on
+the owner's unit. Full external storage restore through RMS requires a running nicFW
+application. Retain both a matching working application image and device-specific
+storage/codeplug/power/calibration backups; the application file alone contains none
+of those external data backups. No radio was written during this investigation.
