@@ -90,3 +90,30 @@ The next steps and acceptance evidence are in [Bring-up plan](../testing/rt880-b
 
 These identify the reference image and updater context. They do not license incorporating
 the firmware into RadioFoundry or establish this unit's hardware revision.
+
+
+## Software-observed GPIO assignments
+
+Updated November 1, 2026. The external reference investigation recovered the initialized data
+and tested known byte transfers in an isolated CPU emulator. The following are software-observed
+assignments for the reference SHA-256 above, not measured board wiring. No binary, disassembly,
+register initialization sequence or external implementation is included here.
+
+| Interface | Clock | Select | Data | Other |
+|---|---|---|---|---|
+| RF path A | PC8 | PC7, active low | PC6, bidirectional | Board initialization selects this path |
+| RF path B | PF6 | PA8, active low | PC9, bidirectional | Software can select this separate pin group |
+| External SPI NOR | PB13 | PB12, active low | PB15 MOSI; PB14 MISO | Chip part and capacity not identified |
+| Serial display | PB3 | PA15, active low | PB5 output | PC13 D/C, high for data; PC14 likely reset, active low |
+| Tuner I2C | PC0 SCL | Address 0x11 | PC1 SDA, bidirectional | Command structure consistent with Si47xx |
+
+The display initialization addresses a 240 by 320 pixel window with RGB565 format and a
+ST77xx-compatible command set. ST7789-class is a candidate; controller ID has not been read.
+The physical number and role of RF chips cannot be established from two selectable pin groups alone.
+USART6 is initially configured at 38400 baud with PA11/PA12 alternate function 8. Its wiring,
+TX/RX assignment and purpose remain unconfirmed.
+
+Five emulator checks reconstructed the expected output bytes for both RF paths, external SPI
+and display command/data. This does not verify clock timing, slave responses or electrical levels.
+PTT, power latch, PA control, RF switching, audio routing and calibration boundaries remain open.
+These observations narrow the investigation; they do not authorize a flash image or transmitter bring-up.
