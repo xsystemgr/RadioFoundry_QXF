@@ -25,6 +25,9 @@
 #include "dmr/otap.h"
 
 #define OTAP_SEND_WAIT_MS	10000	// an answer or console command not sent by then is dropped
+#define OTAP_SEND_TRIES		3	// a message is put on air this many times (unconfirmed), so a target that missed
+					// the first burst still catches it; the duplicates are dropped by the replay counter
+#define OTAP_SEND_GAP_MS	600	// between those tries, long enough for the other radio to answer in the gap
 #define OTAP_CONSOLE_RING	4
 
 typedef enum { OTAP_SEND_IDLE, OTAP_SEND_QUEUED, OTAP_SEND_SENT, OTAP_SEND_FAILED } otap_send_state_t;

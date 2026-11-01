@@ -55,7 +55,13 @@ static void deliver(const otapKeys_t *k, uint8_t cmd, uint32_t counter, uint32_t
 
 static void run_tick(void)
 {
-	otap_tick(OUR_ID, true, 1000);	// a channel we may send on
+	// Drive the whole send: the message goes out OTAP_SEND_TRIES times (unconfirmed retries), each after the gap,
+	// and only then does the sent / answered counter advance
+	uint32_t t = 1000;	// a channel we may send on
+	for (int i = 0; i < OTAP_SEND_TRIES; i++) {
+		otap_tick(OUR_ID, true, t);
+		t += OTAP_SEND_GAP_MS;
+	}
 }
 
 int main(void)

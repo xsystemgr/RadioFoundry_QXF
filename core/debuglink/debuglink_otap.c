@@ -86,6 +86,19 @@ size_t debuglink_cmd_otap(const uint8_t *req, uint16_t len, uint8_t *out, size_t
 		out[0] = otap_console_send(m.dst, a, n) ? DL_ST_OK : DL_ST_BUSY;
 		return 1;
 	}
+	case DL_OTAP_OP_STATS: {
+		otap_stats_t st;
+		otap_get_stats(&st);
+		const uint32_t v[14] = { st.rx, st.bad, st.off, st.bad_tag, st.replay, st.not_admin, st.busy, st.done,
+					 st.answers, st.answer_failed, st.console_rx, st.console_dropped, st.console_sent,
+					 st.console_failed };
+		out[0] = DL_ST_OK;
+		for (unsigned i = 0; i < 14; i++) {
+			out[1 + 4 * i] = (uint8_t)(v[i] >> 24); out[2 + 4 * i] = (uint8_t)(v[i] >> 16);
+			out[3 + 4 * i] = (uint8_t)(v[i] >> 8);  out[4 + 4 * i] = (uint8_t)v[i];
+		}
+		return 1 + 4 * 14;
+	}
 	case DL_OTAP_OP_RECV: {
 		uint32_t src = 0;
 		uint8_t msg[OTAP_MSG_MAX];

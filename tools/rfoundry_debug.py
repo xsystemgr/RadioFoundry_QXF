@@ -94,7 +94,7 @@ RX2_FLAGS = {1: "present", 2: "up", 4: "bridge", 8: "restart"}
 SNMP = 0x19                         # the SNMP agent (CONFIG_SNMP; docs/spec/debuglink.md 3.17, docs/spec/snmp.md)
 SNMP_OP_SET, SNMP_OP_COMMUNITY, SNMP_OP_TEST_TRAP = range(3)
 OTAP = 0x1F                         # fleet administration (CONFIG_OTAP; docs/spec/debuglink.md 3.23, docs/spec/otap.md)
-OTAP_OP_INFO, OTAP_OP_SECRET, OTAP_OP_FLAGS, OTAP_OP_ADMIN, OTAP_OP_SEND, OTAP_OP_RECV = range(6)
+OTAP_OP_INFO, OTAP_OP_SECRET, OTAP_OP_FLAGS, OTAP_OP_ADMIN, OTAP_OP_SEND, OTAP_OP_RECV, OTAP_OP_STATS = range(7)
 OTAP_FLAG_SETTINGS, OTAP_FLAG_KEYS = 0x01, 0x02     # settings_t.otap_flags
 OTAP_PORT = 4101
 OTAP_VERSION = 1
@@ -1030,6 +1030,14 @@ class DebugLink:
         n = r[4]
         return src, bytes(r[5:5 + n])
 
+    OTAP_STAT_NAMES = ["rx", "bad", "off", "bad_tag", "replay", "not_admin", "busy", "done",
+                       "answers", "answer_failed", "console_rx", "console_dropped", "console_sent", "console_failed"]
+
+    def otap_stats(self):
+        r = self.otap_request(OTAP_OP_STATS)
+        vals = struct.unpack(">14I", r[:56])
+        return dict(zip(self.OTAP_STAT_NAMES, vals))
+
 
 # ── OTAP/OTAR message crypto (mirrors core/dmr/otap.c; docs/spec/otap.md) ─────
 
@@ -1846,6 +1854,10 @@ def cmd_otap(link, a):
         link.otap_set_secret(b"")
         print("fleet admin off on this radio (secret cleared)")
         return 0
+    if a.op == "stats":
+        for k, v in link.otap_stats().items():
+            print(f"{k:<16}{v}")
+        return 0
     # The commands that go on air (the PC signs them): need the fleet secret and a target ID
     secret = _otap_secret_arg(a)
     if secret is None:
@@ -1964,7 +1976,7 @@ def main(argv=None):
                    "number or names " + ",".join(SNMP_FLAGS) + "); read / write: [COMMUNITY] (none: the default)")
     p = sub.add_parser("otap", help="fleet administration over DMR (CONFIG_OTAP; docs/spec/otap.md). Provision this "
                        "radio, or sign and send a command to a fleet radio")
-    p.add_argument("op", choices=["info", "provision", "off", "status", "talk-tg", "rx-tg", "zone", "privacy", "set-key"])
+    p.add_argument("op", choices=["info", "provision", "off", "stats", "status", "talk-tg", "rx-tg", "zone", "privacy", "set-key"])
     p.add_argument("target", nargs="?", help="the target radio's DMR ID (for the on-air commands)")
     p.add_argument("args", nargs="*", help="talk-tg/rx-tg: TG; zone: POSITION; privacy: on|off; set-key: TYPE KEY [on]")
     p.add_argument("--secret", help="the 32-byte fleet secret as 64 hex chars")

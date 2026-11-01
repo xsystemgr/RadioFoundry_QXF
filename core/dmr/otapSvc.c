@@ -24,7 +24,8 @@ static otap_request_t request;
 // One outbound datagram at a time (an answer, or a console command): built, then sent when the channel lets us
 static bool out_pending;
 static bool out_console;		// for the stats: a console send, not an answer
-static uint32_t out_dst, out_at;
+static uint32_t out_dst, out_at, out_last;
+static uint8_t out_tries;
 static uint8_t out_msg[UDP_HEADER + OTAP_MSG_MAX];	// the UDP header is filled by the data service; we hold payload
 static uint8_t out_len;
 
@@ -216,28 +217,36 @@ void otap_tick(uint32_t own_id, bool can_send, uint32_t now_ms)
 	self_id = own_id;
 	if (!out_pending)
 		return;
-	if (out_at == 0)
+	if (out_at == 0) {
 		out_at = now_ms ? now_ms : 1;
+		out_last = 0;
+		out_tries = 0;
+	}
+	// Give up if the channel never let any copy out in the window
 	if ((now_ms - out_at) >= OTAP_SEND_WAIT_MS) {
 		dmrDataServiceLock();
 		out_pending = false;
 		dmrDataServiceUnlock();
-		if (out_console)
-			stats.console_failed++;
-		else
-			stats.answer_failed++;
+		if (out_tries > 0) {
+			if (out_console) stats.console_sent++; else stats.answers++;
+		} else {
+			if (out_console) stats.console_failed++; else stats.answer_failed++;
+		}
 		return;
 	}
 	if (!can_send)
 		return;
+	if ((out_last != 0) && ((now_ms - out_last) < OTAP_SEND_GAP_MS))
+		return;	// wait between tries, so the other radio can answer in the gap
 	if (dmrDataServiceSendUDP(false, out_dst, OTAP_PORT, OTAP_PORT, &out_msg[UDP_HEADER], out_len)) {
-		dmrDataServiceLock();
-		out_pending = false;
-		dmrDataServiceUnlock();
-		if (out_console)
-			stats.console_sent++;
-		else
-			stats.answers++;
+		out_last = now_ms ? now_ms : 1;
+		out_tries++;
+		if (out_tries >= OTAP_SEND_TRIES) {
+			dmrDataServiceLock();
+			out_pending = false;
+			dmrDataServiceUnlock();
+			if (out_console) stats.console_sent++; else stats.answers++;
+		}
 	}
 }
 
