@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "config.h"	// CONFIG_PRIVACY_BANDS, CONFIG_OTAP gate the fields below
 
 #define SETTINGS_LAYOUT		1	// bumped only when a field changes meaning or moves (old records then reset)
 #define SETTINGS_SAVE_DELAY_MS	2000
@@ -232,20 +233,25 @@ typedef struct {
 	// a 24-bit talkgroup, 0 = none. An older record reads as none
 	uint32_t vfo_rx_tg;
 	uint32_t vfo2_rx_tg;
+#if CONFIG_PRIVACY_BANDS
 	// Privacy bands (appended): where our calls may go out encrypted, pairs of kHz (lo, hi), lo 0 = unused. Outside
-	// them a loaded key still decrypts what is heard, but our calls go out in the clear (dmr-voice.md, privacy bands)
+	// them a loaded key still decrypts what is heard, but our calls go out in the clear (dmr-voice.md, privacy bands).
+	// A board tight on RAM leaves CONFIG_PRIVACY_BANDS off and this field out
 	uint32_t privacy_band[SETTINGS_PRIVACY_BANDS][2];
+#endif
+#if CONFIG_OTAP
 	uint8_t reserved_p1end[8];	// pad so the page 2 block below starts at the page boundary (472), not straddling it
 	// Fleet admin over DMR data (CONFIG_OTAP, docs/spec/otap.md): the 32-octet shared secret all the owner's radios
 	// hold (set over USB, never on air; all zeros = the service is off), the highest request counter taken so far
 	// (replays of an older command are refused), the flags (SETTINGS_OTAP_*), and up to two DMR IDs allowed to
 	// command us (0 = unused; none set = any sender holding the secret). A record from before reads the secret as
-	// zeros, so the service stays off until the user provisions it
+	// zeros, so the service stays off until the user provisions it. A board without CONFIG_OTAP leaves this out
 	uint8_t otap_secret[OTAP_SECRET_LEN];
 	uint32_t otap_counter;
 	uint32_t otap_admin[2];
 	uint8_t otap_flags;
 	uint8_t reserved9[3];
+#endif
 } settings_t;
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size

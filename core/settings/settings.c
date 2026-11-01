@@ -27,8 +27,14 @@ _Static_assert(SETTINGS_PAGE_BYTES == PAYLOAD_MAX, "a page is a slot's payload")
 _Static_assert(SETTINGS_PAGES <= SETTINGS_PAGES_MAX, "settings_t outgrew its pages");
 _Static_assert(sizeof(settings_t) % 4 == 0, "settings_t has tail padding");
 _Static_assert(offsetof(settings_t, dual_b) == SETTINGS_PAGE_BYTES, "page 1 starts at its first field");
+#if CONFIG_OTAP
 _Static_assert(offsetof(settings_t, otap_secret) == 2u * SETTINGS_PAGE_BYTES, "page 2 starts at its first field");
 _Static_assert(sizeof(settings_t) == 520, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
+#elif CONFIG_PRIVACY_BANDS
+_Static_assert(sizeof(settings_t) == 464, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
+#else
+_Static_assert(sizeof(settings_t) == 400, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
+#endif
 
 static settings_t live;			// under the quick lock
 static settings_t saved;		// what the newest record holds (or the defaults)
@@ -63,6 +69,7 @@ void settings_defaults(settings_t *s)
 	s->vfo2_power = SETTINGS_UNSET8;
 	s->vfo2_cc = 1;
 	s->vfo2_ts = 1;
+#if CONFIG_PRIVACY_BANDS
 	// Where our calls may go out encrypted until the user changes it (dmr-voice.md, privacy bands): VHF from 143 MHz
 	// and 146-174 MHz, LPD 433, UHF 440-470 MHz (PMR446 and 466 MHz in it). Not 144-146 MHz nor 430-440 MHz outside
 	// LPD: amateur bands, where encryption is not allowed
@@ -70,6 +77,7 @@ void settings_defaults(settings_t *s)
 		{ 143000u, 143999u }, { 146000u, 174000u }, { 433050u, 434790u }, { 440000u, 470000u },
 	};
 	memcpy(s->privacy_band, bands, sizeof bands);
+#endif
 }
 
 // Page k of a settings_t: its offset and length

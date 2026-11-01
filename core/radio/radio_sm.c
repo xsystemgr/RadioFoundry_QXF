@@ -965,13 +965,19 @@ static void dmr_load_channel(radio_sm_t *sm)
 #if CONFIG_DMR_PRIVACY
 static dmrPrivacyKey_t privacy_key;	// the call stack's privacy hook context (radio task only)
 
-// Whether a transmit frequency is inside one of the settings' privacy bands
+// Whether a transmit frequency is inside one of the settings' privacy bands. Without CONFIG_PRIVACY_BANDS a loaded
+// key encrypts wherever privacy is on (the earlier behavior)
 static bool privacy_tx_allowed(uint32_t hz)
 {
+#if CONFIG_PRIVACY_BANDS
 	const settings_t *st = settings_begin();
 	bool ok = dmrPrivacyBandAllowed((const uint32_t (*)[2])st->privacy_band, SETTINGS_PRIVACY_BANDS, hz);
 	settings_end(0);	// read only: nothing changed, so the time isn't used
 	return ok;
+#else
+	(void)hz;
+	return true;
+#endif
 }
 #endif
 

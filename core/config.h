@@ -272,6 +272,12 @@
 #ifndef CONFIG_OTAP
 #define CONFIG_OTAP			(CONFIG_DMR_PRIVACY && CONFIG_DMR_DATA_CORE)
 #endif
+// Privacy transmit bands (settings_t.privacy_band, docs/spec/otap.md 2, dmr-voice.md): the frequency ranges where a
+// loaded privacy key encrypts our transmissions; outside them calls go out in the clear. Needs privacy. A RAM-tight
+// board may turn it off (then a key encrypts wherever privacy is on, the earlier behavior)
+#ifndef CONFIG_PRIVACY_BANDS
+#define CONFIG_PRIVACY_BANDS		CONFIG_DMR_PRIVACY
+#endif
 // The air queue (core/dmr/dmrAirQueue.c): what the IP gateway and zone sharing send, in order with the guard
 #define CONFIG_DMR_AIR_QUEUE		(CONFIG_DMR_IP_GATEWAY || CONFIG_ZONE_SHARE)
 

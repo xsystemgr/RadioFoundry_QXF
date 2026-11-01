@@ -34,7 +34,7 @@ static const char *em_mode_key(uint8_t m)
 
 void debuglink_view_dmr_ext(dl_text_t *t)
 {
-#if CONFIG_DMR_PRIVACY
+#if CONFIG_PRIVACY_BANDS
 	// The privacy bands (settings_t.privacy_band): "lo-hi" in kHz, the unused ones left out
 	{
 		uint32_t b[SETTINGS_PRIVACY_BANDS][2];
