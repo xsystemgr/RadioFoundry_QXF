@@ -3,9 +3,10 @@
 
 # RT-880 bring-up plan
 
-Status: pre-bring-up research. No RadioFoundry image exists and no hardware test has been run.
+Status: private UI bring-up target builds. No hardware test has been run.
 The input facts and unknowns are in [Hardware investigation](../spec/hardware-rt880.md).
-Follow [Adding a radio](../dev/adding-a-radio.md) and [Clean-room rules](../CLEANROOM.md).
+Follow [Adding a radio](../dev/adding-a-radio.md). The owner explicitly waived the
+[clean-room role separation](../CLEANROOM.md) for the closed experiment on November 1, 2026.
 
 ## First milestone
 
@@ -57,3 +58,15 @@ useful as an analog firmware even if no digital mode is feasible.
 
 No flashing or radio transmission is authorized by this document. Hardware operations follow
 the owner's specific test request and the repository's opt-in HIL procedure.
+
+
+## Private build checkpoint
+
+An experimental standalone build now exists at
+[boards/rt880](../../boards/rt880/README.md). It reuses the existing RadioFoundry
+core/UI with a new AT32F423 platform and GPIO serial LCD backend. It is deliberately
+not registered for releases or automatic flashing. The host test covers TX and
+storage rejection, keypad scanning and the serial display contract. Link usage is
+91,852 bytes flash and 44,456 bytes SRAM. The candidate device and memory map still
+need independent physical confirmation. A CPU startup model is not completion of
+steps 1-7 above; there has been no physical boot or receive test.

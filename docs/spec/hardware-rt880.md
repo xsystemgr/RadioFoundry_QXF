@@ -3,7 +3,7 @@
 
 # Radtel RT-880: port investigation
 
-Status: research only. There is no buildable board target or tested RadioFoundry image yet.
+Status: private UI bring-up. An experimental standalone target builds; no physical test has run.
 The first target is analog FM receive. Digital voice is a separate feasibility question.
 The owner's exact model suffix and PCB revision still need confirmation.
 
@@ -29,8 +29,9 @@ initialization tables, strings, menus, fonts, or function structure. See [Clean-
 
 The candidate application address was checked against the startup and exception vector targets
 in the external investigation. The image does not contain the bytes below that address.
-Do not turn the candidate address into a linker script or flasher profile until device identity,
-bootloader behavior, flash geometry and protected regions have independent confirmation.
+The private lab linker uses this candidate address as an explicit assumption. This does not
+verify device identity, bootloader behavior, flash geometry or protected regions, and it must
+not become a flasher profile until those facts have independent confirmation.
 
 The generic [image header inspector](../../tools/inspect_image_header.py) reproduces the size,
 hash and vector observations without decoding instructions:
@@ -156,10 +157,14 @@ A full 240 by 320 RGB565 frame needs 153,600 bytes. A 4-bit indexed frame needs
 Choose a measured display geometry/scale and feature profile after a linker map exists.
 Do not claim the default configuration of an existing board fits this MCU.
 
-No actual board implementation, ELF or flashable RadioFoundry image exists yet. The
-remaining hardware blockers are external PA/power control, storage protection and a
-verified loader/recovery route. This specification is the input for independent
-implementation under the repository's clean-room role separation.
+A private UI-only board implementation now builds through
+`make -f boards/rt880/Makefile image` (run from the repository root). It uses the
+existing RadioFoundry core and a new platform/HAL; it is not a functioning receiver.
+The owner explicitly waived clean-room role separation for this closed experiment
+on November 1, 2026. No reference firmware code or initialization tables were imported.
+The remaining hardware blockers are external PA/power control, MCU verification,
+storage protection and a verified loader/recovery route. See the
+[experimental target](../../boards/rt880/README.md) for restrictions and tests.
 
 
 ## Band routing and loader investigation
@@ -234,3 +239,25 @@ compatibility, section alignment gaps, hardware identity or flashing safety.
 This establishes a plausible reduced-memory starting point for an independently
 implemented platform. It does not complete board glue, the PA safe-off state,
 display adaptation, calibration protection or loader/recovery validation.
+
+
+## Private UI target result
+
+The standalone target is intentionally absent from release and flashing registries.
+The first linked image allocates 91,852 bytes in flash and 44,456 bytes in SRAM,
+including 12 KiB RTOS heap and 4 KiB C heap/main stack reservation. The candidate
+SRAM region ends eight bytes below 48 KiB; the linker leaves another 4,688 bytes
+unallocated. This memory map is conditional on the assumed AT32F423 part.
+
+The HAL rejects both RX and TX and all external storage operations. It deasserts
+both RF chip selects, but it cannot establish external PA shutdown. It does not
+bind PTT or configure unverified PA/battery/audio controls. The UI is landscape
+160 by 120, scaled 2x through the existing ST7789 driver. Raw key positions 0-3
+have temporary navigation assignments; physical legends are not established.
+
+Host tests cover request rejection without GPIO writes, band/key TX restrictions,
+all matrix positions, and LCD chip select, pixel byte order and scaling. A CPU
+model reached kernel task handoff and startup housekeeping with 1,608 bytes of RTOS
+heap free. Delays and pixel bursts were bypassed in that model. It does not prove
+hardware compatibility, safe RF state, live interrupt/context switching or runtime
+peak memory. No connected hardware was flashed or tested.
