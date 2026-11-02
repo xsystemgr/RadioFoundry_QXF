@@ -143,3 +143,15 @@ leaves the key change off and keeps the privacy bands empty; the authenticated c
 (the signature only proves who sent them, it does not hide anything). Encryption, and so OTAR, belong on licensed PMR
 or business frequencies. The radio enforces the band rule for key use (1); the operator is responsible for staying
 within their licence.
+
+## 8. Operating notes
+
+- **RF into the programming cable.** Running a fleet command keys the admin radio's transmitter while the USB
+  programming cable is attached, and on an unshielded cable the transmitted RF can couple into the USB line and drop
+  the serial link (on Windows, a WriteFile that fails with "the device does not recognize this command"). It is a
+  cable/EMC effect, not a firmware fault: the command still goes out (the fleet receives it) and the link returns when
+  the radio re-enumerates. Mitigations: a snap-on ferrite on the cable near the radio, a short shielded cable, the
+  antenna kept away from the cable, and the admin radio on low power (nearby fleet radios need little). A future option
+  to force OTAP transmissions to low power regardless of the channel would reduce it further.
+- **Confirming a group rekey.** A group (talkgroup) command is not acknowledged, so after a fleet rekey confirm on a
+  receiving radio with its OTAP counters (`rx`/`done` rose) or by testing privacy, rather than waiting for a reply.
