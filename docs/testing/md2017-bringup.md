@@ -30,10 +30,17 @@ transmit** (`tx_block`: "MD-2017 bring-up: RX only"; `MD2017_DEFS="-DMD2017_TX=1
 
 ## 2. Keys and knobs
 
-The keypad matrix is the MD-UV380's and may be wrong. Press each key with the diagnostics page open; note what the UI
-does. The diagnostics page's last two lines show the inputs the TYT image reads whose use is unknown
-(`A13:1 A15:1 ...`, three lines with E11 (PTT) and E12, 1 = high; PE12, the MD-UV380's external PTT, is not taken as PTT here): press each side key and turn each knob, and note
-which digit moves.
+The keypad matrix is the MD-UV380's and may be wrong. The diagnostics page has a `kbd` line that reads the raw keypad
+scan **independent of the matrix**: `kbd R0:00 R1:00 R2:00`, each the hex of that row's pressed columns (bit k = column
+Dk). Press each key in turn and read which row and column bit light up: that gives the true `(row, column)` of every
+key, which is what `boards/md2017/board.c` `uvf_key_matrix[row][column]` must hold. A key that does the wrong thing, or
+nothing, is a wrong or missing cell there. (The factory TYT image can be decrypted for cross-checking — the key is
+derived from the file, `tools/rfoundry` `stockfw.derive_key` with the MD-UV380 key identity — but the raw scan above is
+the authoritative source for the wiring.)
+
+The remaining diagnostics lines show the inputs the TYT image reads whose use is unknown (`A13:1 A15:1 ...`, with E11
+(PTT), E12, 1 = high; PE12, the MD-UV380's external PTT, is not taken as PTT here): press each side key and turn each
+knob, and note which digit moves.
 
 ## 3. Receiver A, FM
 

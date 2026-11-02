@@ -57,6 +57,13 @@ static void init(void)
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
+// The raw keypad scan for the diagnostics page: raw[r] holds row r's column bits (bit n = Dn pressed), independent of
+// the key matrix, so a wrong matrix can still be found by pressing each key and reading (row, column)
+void uvf_keypad_raw(uint8_t raw[STM32_KEYPAD_MAX_ROWS])
+{
+	stm32_fsmc_keypad_scan(&keypad, raw);
+}
+
 // Called every 10 ms: a change is reported once two scans in a row agree
 static uint32_t scan(void)
 {

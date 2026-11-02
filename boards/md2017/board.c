@@ -59,17 +59,38 @@ static bool diag_line(uint8_t i, char *buf, uint8_t len)
 		{ PIN_IN_PE12, "E12" }, { PIN_IN_PE13, "E13" }, { PIN_IN_PE15, "E15" },
 	};
 	const uint8_t per = 4, count = sizeof in / sizeof in[0];
+	const uint8_t pin_lines = (count + per - 1u) / per;	// the unknown-pin lines (3), then the keypad, then rx2
 	uint8_t n = 0;
 	if (len < 2u) {
 		return false;
 	}
+	// The raw keypad scan: each row's pressed columns as hex (bit k = column Dk), independent of uvf_key_matrix. Press
+	// a key and read which (row, column) lights up, to confirm or correct the matrix (docs/testing/md2017-bringup.md 2)
+	if (i == pin_lines) {
+		static const char hex[] = "0123456789ABCDEF";
+		uint8_t raw[STM32_KEYPAD_MAX_ROWS] = { 0 };
+		uvf_keypad_raw(raw);
+		for (const char *p = "kbd "; *p != '\0' && n + 1u < len; p++) {
+			buf[n++] = *p;
+		}
+		for (uint8_t r = 0; r < 3u && n + 6u < len; r++) {
+			buf[n++] = 'R';
+			buf[n++] = (char)('0' + r);
+			buf[n++] = ':';
+			buf[n++] = hex[(raw[r] >> 4) & 0xFu];
+			buf[n++] = hex[raw[r] & 0xFu];
+			buf[n++] = ' ';
+		}
+		buf[n] = '\0';
+		return true;
+	}
 #if CONFIG_DUAL_WATCH
-	if (i == (count + per - 1u) / per) {
-		uvf_rx2_diag(buf, len);	// receiver B, after the pin lines
+	if (i == pin_lines + 1u) {
+		uvf_rx2_diag(buf, len);	// receiver B, after the keypad line
 		return true;
 	}
 #endif
-	if (i * per >= count) {
+	if (i >= pin_lines) {
 		return false;
 	}
 	for (uint8_t k = i * per; k < count && k < (i + 1u) * per; k++) {

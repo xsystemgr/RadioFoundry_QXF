@@ -158,4 +158,7 @@ bool uvf_direct_tx_ref(uint32_t hz, int8_t ref_offset, int8_t *out);
 // RFOUNDRY_CPU_RAM state and every task stack live. Stops here, at set-up, instead of a silent transfer error later
 #define DMA_RAM_OK(p)	configASSERT(((uintptr_t)(p) >> 24) == 0x20u)
 
+#include "fsmc_keypad/fsmc_keypad.h"
+void uvf_keypad_raw(uint8_t raw[STM32_KEYPAD_MAX_ROWS]);	// raw per-row column bits for the keypad diagnostics
+
 #endif
