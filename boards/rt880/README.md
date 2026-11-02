@@ -36,9 +36,13 @@ The candidate image address is `0x08002800`; loader erase boundaries are unverif
 - The existing BK4819 driver has a new receiver-only initialization entry point.
   It never writes nonzero PA level or GPIO outputs and never enables TX DSP.
   The ordinary main/LO initialization paths retain their previous behavior.
-- Only RF A receives. RF B stays in state zero with PA level zero; its GPIO word
-  is zero during route changes, then `0x10` for VHF RX or `0x20` for UHF RX.
-  It is never used as a synthesizer/LO transmitter. This board differs from the
+- RF B (PF6/PA8/PC9) is the receiver: the factory firmware (RT-880 V1.16) runs its
+  entire main BK4819 setup -- including the AF/audio registers -- on this chip, and
+  the speaker amplifier is fed by its AF output. Receiving on RF A produced only
+  faint bleed through the amp. RF B also carries the band-select GPIO word (reg
+  0x33): zero during route changes, then `0x10` for VHF RX or `0x20` for UHF RX.
+  RF A stays in state zero with PA level zero as the idle control chip and is never
+  used as a synthesizer/LO transmitter. This board differs from the
   existing superheterodyne board supported by the same generic driver.
 - Initial bands: 136-174 and 400-480 MHz FM, 12.5/25 kHz bandwidth. No HF, AM,
   broadcast, CTCSS/DCS, GPS or APRS in this profile. Out-of-band, invalid bandwidth,

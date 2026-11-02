@@ -16,9 +16,7 @@ typedef struct {
 	uint16_t regs[128], id, response;
 } chip_t;
 static chip_t chips[2];
-static bool pins[6][16], panic, boot_star;
-static unsigned tone_pulses;
-bool rt880_audio_test_boot_requested(void) { return boot_star; }
+static bool pins[6][16], panic;
 static unsigned gpio_writes, critical_depth, frames;
 
 static void select_chip(unsigned index, bool high)
@@ -36,10 +34,11 @@ static void select_chip(unsigned index, bool high)
 		if (reg == 0x36) assert(value == 0);
 		if (reg == 0x30) {
 			assert((value & 0x400Eu) == 0); // PA gain, microphone ADC and TX DSP bits stay clear
-			if (index == 1) assert(value == 0);
+			if (index == 0) assert(value == 0); // bus_a is the idle control chip
 		}
 		if (reg == 0x33) {
-			assert(index == 0 ? value == 0 : value == 0 || value == 0x10 || value == 0x20);
+			// Band-select GPIO is written on the receiver (bus_b = index 1).
+			assert(index == 1 ? value == 0 || value == 0x10 || value == 0x20 : value == 0);
 		}
 		if (reg != 0) c->regs[reg] = value;
 		c->writes++; frames++;
@@ -98,13 +97,8 @@ void at32_irq_restore(uint32_t saved) { assert(critical_depth == saved + 1); cri
 void hal_delay_us(uint32_t us) { (void)us; assert(!panic); }
 void hal_delay_ms(uint32_t ms)
 {
+	(void)ms;
 	assert(!panic);
-	if (ms == 150) {
-		assert(chips[0].regs[0x30] == BK4819_STATE_RX && chips[1].regs[0x30] == 0);
-		assert(chips[0].regs[0x47] == 0x6240 && chips[0].regs[0x71] == bk4819_tone_word(1000));
-		if (!pins[2][4]) { assert(pins[5][8] && chips[0].regs[0x70] == 0xB000); tone_pulses++; }
-		else assert(chips[0].regs[0x70] == 0);
-	}
 }
 
 static void tx_is_blocked(void)
@@ -126,34 +120,35 @@ int main(void)
 	chips[0].id = chips[1].id = BK4819_ID;
 	tx_is_blocked();
 	rt880_radio.init();
-	assert(chips[0].regs[0x30] == BK4819_STATE_IDLE_MAIN);
-	assert(chips[1].regs[0x30] == 0 && chips[1].regs[0x33] == 0);
+	// Receiver is the chip on bus_b (PF6/PA8/PC9) = chips[1]; bus_a = idle control.
+	assert(chips[1].regs[0x30] == BK4819_STATE_IDLE_MAIN);
+	assert(chips[0].regs[0x30] == 0 && chips[0].regs[0x33] == 0);
 	assert(rt880_radio.rx(145500000, RADIO_BW_25K, NULL));
-	assert(chips[1].regs[0x33] == 0x10 && chips[0].regs[0x30] == BK4819_STATE_RX);
-	assert((((uint32_t)chips[0].regs[0x39] << 16) | chips[0].regs[0x38]) == 14550000);
+	assert(chips[1].regs[0x33] == 0x10 && chips[1].regs[0x30] == BK4819_STATE_RX);
+	assert((((uint32_t)chips[1].regs[0x39] << 16) | chips[1].regs[0x38]) == 14550000);
 	rt880_radio.audio(true);
-	assert(!pins[2][4] && pins[5][8] && chips[0].regs[0x47] == BK4819_AF_FM);
-	assert(chips[0].regs[0x48] == 0xB3B8);
+	assert(!pins[2][4] && pins[5][8] && chips[1].regs[0x47] == BK4819_AF_FM);
+	assert(chips[1].regs[0x48] == 0xB3B8);
 	assert(rt880_radio.volume != NULL);
 	rt880_radio.volume(0);
-	assert(pins[2][4] && !pins[5][8] && chips[0].regs[0x47] == BK4819_AF_MUTE);
+	assert(pins[2][4] && !pins[5][8] && chips[1].regs[0x47] == BK4819_AF_MUTE);
 	rt880_radio.volume(100);
-	assert(!pins[2][4] && pins[5][8] && chips[0].regs[0x48] == 0xB3BF);
+	assert(!pins[2][4] && pins[5][8] && chips[1].regs[0x48] == 0xB3BF);
 	rt880_radio.volume(255);
-	assert(chips[0].regs[0x48] == 0xB3BF);
+	assert(chips[1].regs[0x48] == 0xB3BF);
 	rt880_radio.audio(false);
 	rt880_radio.volume(50);
-	assert(pins[2][4] && !pins[5][8] && chips[0].regs[0x48] == 0xB3B8);
+	assert(pins[2][4] && !pins[5][8] && chips[1].regs[0x48] == 0xB3B8);
 	rt880_radio.audio(true);
 	char diag[48];
 	assert(rt880_rf_diag(3, diag, sizeof(diag)) && strstr(diag, "AF:6140 G:B3B8"));
 	assert(rt880_rf_diag(4, diag, sizeof(diag)) && strstr(diag, "Audio OPEN V:50"));
-	chips[0].regs[0x67] = 140; chips[0].regs[0x65] = 23;
+	chips[1].regs[0x67] = 140; chips[1].regs[0x65] = 23;
 	radio_status_t status;
-	unsigned setups = chips[0].output_setups;
+	unsigned setups = chips[1].output_setups;
 	rt880_radio.status(&status);
 	// Three reads: change direction once per command, never for each data bit.
-	assert(chips[0].output_setups - setups <= 3);
+	assert(chips[1].output_setups - setups <= 3);
 	assert(status.rssi_dbm == -90 && status.noise == 23 && status.tone_ok);
 	assert(rt880_radio.rx(433500000, RADIO_BW_12K5, NULL));
 	assert(chips[1].regs[0x33] == 0x20 && pins[2][4] && !pins[5][8]);
@@ -194,16 +189,13 @@ int main(void)
 		assert(pins[2][4] && !pins[5][8]);
 		chips[index].id = BK4819_ID;
 	}
-	boot_star = true;
 	rt880_radio.init();
 	assert(rt880_radio.rx(145500000, RADIO_BW_25K, NULL));
-	assert(tone_pulses == 2 && chips[0].regs[0x70] == 0 && chips[0].regs[0x71] == 0);
-	assert(chips[0].regs[0x47] == BK4819_AF_MUTE && pins[2][4] && !pins[5][8]);
-	assert(chips[0].regs[0x48] == 0xB3B8);
-	assert(rt880_rf_diag(10, diag, sizeof(diag)) && strstr(diag, "TestAF:6240 P:2"));
-	assert(rt880_radio.rx(433500000, RADIO_BW_25K, NULL) && tone_pulses == 2);
+	assert(chips[1].regs[0x47] == BK4819_AF_MUTE && pins[2][4] && !pins[5][8]);
+	assert(chips[1].regs[0x48] == 0xB3B8);
+	assert(rt880_radio.rx(433500000, RADIO_BW_25K, NULL));
 	rt880_radio.audio(true);
-	assert(!pins[2][4] && pins[5][8] && chips[0].regs[0x47] == BK4819_AF_FM);
+	assert(!pins[2][4] && pins[5][8] && chips[1].regs[0x47] == BK4819_AF_FM);
 	assert(critical_depth == 0);
 	printf("radio-test: RX routes/tuning/status/audio, ID failures and fault shutdown passed (%u frames); TX always denied\n", frames);
 	return 0;
