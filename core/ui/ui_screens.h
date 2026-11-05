@@ -133,7 +133,8 @@ enum {
 	QT_POWER, QT_SQUELCH, QT_TONE, QT_MODE, QT_MONITOR, QT_VOX, QT_SCAN, QT_BANDWIDTH, QT_BRIGHTNESS,
 	QT_TIMESLOT, QT_CC, QT_HEAR_ALL, QT_PRIVACY, QT_TALK_TO,
 	QT_TO_VFO,		// on a channel, in place of QT_MODE: copy the channel to the VFO
-
+	QT_HFMODE,		// HF broadcast receiver: demod override (Auto / AM / LSB / USB)
+	QT_HFBFO,		// HF broadcast receiver: SSB fine-tune (BFO)
 };
 // The tile kind at position 0..8 (keys 1..9) for this channel or the VFO
 uint8_t ui_quick_kind(int pos, const radio_view_t *v);

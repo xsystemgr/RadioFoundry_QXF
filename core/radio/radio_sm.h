@@ -141,6 +141,8 @@ typedef enum {
 	RREQ_VFO_COPY,		// the channel's settings into the VFO, and open it (CONFIG_VFO); no-op in the VFO
 	RREQ_DTMF,		// arg: the digit (ASCII) in bits 7:0, bit 8 = key down (0 = up)
 	RREQ_DUAL,		// dual watch (CONFIG_DUAL_WATCH): arg channel A, arg2 channel B, radio_dual_arg()
+	RREQ_BCAST_MODE,	// HF (CONFIG_BCAST_FM): cycle the demod override AUTO -> AM -> LSB -> USB
+	RREQ_BCAST_BFO,		// HF: arg = SSB fine-tune direction (+1 / -1)
 } radio_req_type_t;
 
 // RREQ_TONE's argument: which (RADIO_TONE_*) in bits 25:24, the tone type in 23:16, the value in 15:0
@@ -252,6 +254,8 @@ typedef struct {
 	bool bcast_on;			// the broadcast receiver is powered (radio_bcast.h)
 	int8_t bcast_audio_out;		// last board.bcast audio / volume sent, -1 = not yet
 	int8_t bcast_volume_out;
+	uint8_t bcast_override;		// HF demod override: 0 auto, 1 AM, 2 LSB, 3 USB (board.bcast->set_demod)
+	int16_t bcast_bfo;		// HF SSB fine-tune offset in Hz (board.bcast->set_bfo)
 #endif
 	int8_t green_out;
 	int8_t red_out;

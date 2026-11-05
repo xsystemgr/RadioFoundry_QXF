@@ -16,6 +16,8 @@
 void at32_pin_output(uint32_t port, unsigned pin, bool level);
 void at32_pin_input(uint32_t port, unsigned pin);
 void at32_pin_input_floating(uint32_t port, unsigned pin);
+void at32_pin_input_pullup(uint32_t port, unsigned pin);
+uint16_t at32_port_inputs(uint32_t port);
 uint32_t at32_irq_save(void);
 void at32_irq_restore(uint32_t state);
 void at32_port_write(uint32_t port, uint32_t set_clear);

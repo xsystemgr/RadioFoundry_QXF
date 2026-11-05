@@ -294,6 +294,9 @@ typedef struct {
 	bool bcast;
 	bool bcast_fault;
 	uint32_t bcast_khz;		// what the receiver reports it is tuned to, for the debug link (0 = not playing)
+	uint8_t bcast_demod;		// bcast_demod_t: FM/AM/LSB/USB on the broadcast receiver, for the mode label
+	uint8_t bcast_override;		// HF demod override as set: 0 auto, 1 AM, 2 LSB, 3 USB (for the Quick tile)
+	int16_t bcast_bfo;		// HF SSB fine-tune offset in Hz (for the Quick tile)
 #if CONFIG_DMR
 	radio_dmr_view_t dmr;
 #endif
@@ -433,6 +436,10 @@ void radio_req_beep(uint8_t beep);
 void radio_req_vibrate(uint8_t pattern);
 // FM 1750 Hz tone burst while on (CONFIG_FM_TX_TONES): keys up if not transmitting, stops when off
 void radio_req_tone_burst(bool on);
+#if CONFIG_BCAST_FM
+void radio_req_bcast_mode(void);	// HF: cycle the demod override AUTO -> AM -> LSB -> USB
+void radio_req_bcast_bfo(int8_t dir);	// HF: SSB fine-tune, dir +1 / -1
+#endif
 // A DTMF key down / up (CONFIG_DTMF; radio-features.md 3.7): digit '0'-'9', '*', '#', 'A'-'D'. Ignored unless the
 // view's dtmf_ready; the tone lasts at least RADIO_DTMF_MIN_MS. The input task sends the keypad's edges (any task)
 void radio_req_dtmf(char digit, bool down);

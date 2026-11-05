@@ -282,6 +282,10 @@ void radio_req_monitor(bool down) { post(RREQ_MONITOR, down, pdMS_TO_TICKS(50));
 void radio_req_monitor_held_up(void) { post(RREQ_MONITOR, 2, pdMS_TO_TICKS(50)); }
 void radio_req_power(int8_t dir) { post(RREQ_POWER, dir, 0); }
 void radio_req_squelch(int8_t dir) { post(RREQ_SQUELCH, dir, 0); }
+#if CONFIG_BCAST_FM
+void radio_req_bcast_mode(void) { post(RREQ_BCAST_MODE, 0, 0); }
+void radio_req_bcast_bfo(int8_t dir) { post(RREQ_BCAST_BFO, dir, 0); }
+#endif
 // The level must not be lost: the user looks at the bar, and the setting is already saved
 void radio_req_volume(uint8_t step) { post(RREQ_VOLUME, step, pdMS_TO_TICKS(50)); }
 void radio_req_volume_override(int8_t step) { post(RREQ_VOLUME_OVERRIDE, step, pdMS_TO_TICKS(50)); }

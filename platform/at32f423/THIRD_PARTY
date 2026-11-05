@@ -2,3 +2,4 @@
 # Copyright (c) 2026 The RadioFoundry Authors
 FreeRTOS-Kernel: MIT
 newlib-nano: BSD
+Si4732 SSB patch - PU2CLR SI4735 / V.Afonkin: non-commercial

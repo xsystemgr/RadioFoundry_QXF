@@ -241,6 +241,16 @@ static uint8_t rssi_bars(int16_t dbm)
 // The mode word: AM where an FM channel or the VFO is received in AM (the air band)
 static const char *mode_word(const radio_view_t *v)
 {
+#if CONFIG_BCAST_FM
+	if (v->bcast) {
+		switch (v->bcast_demod) {
+		case BCAST_DEMOD_AM: return "AM";
+		case BCAST_DEMOD_LSB: return "LSB";
+		case BCAST_DEMOD_USB: return "USB";
+		default: return "FM";
+		}
+	}
+#endif
 	return v->ch.mode == RADIO_MODE_DMR ? "DMR" : v->am ? "AM" : "FM";
 }
 
@@ -921,7 +931,16 @@ static void draw_chips(const radio_view_t *v, const ui_state_t *s)
 #endif
 	if (v->am || v->bcast) {
 		// No tone, width or power here: the receiver is fixed. The air band squelch is real, the broadcast one isn't used
-		x = gfx_text(f, x, y, v->am ? "Air Band AM" : "Broadcast FM", ui_col.fg) + f->w;
+		const char *blabel = "Broadcast FM";
+#if CONFIG_BCAST_FM
+		switch (v->bcast_demod) {
+		case BCAST_DEMOD_AM: blabel = "HF AM"; break;
+		case BCAST_DEMOD_LSB: blabel = "HF LSB"; break;
+		case BCAST_DEMOD_USB: blabel = "HF USB"; break;
+		default: break;
+		}
+#endif
+		x = gfx_text(f, x, y, v->am ? "Air Band AM" : blabel, ui_col.fg) + f->w;
 		if (v->am) {
 			sb_init(&b, buf, sizeof buf);
 			sb_str(&b, "SQ");
@@ -2609,6 +2628,16 @@ uint8_t ui_quick_kind(int pos, const radio_view_t *v)
 	};
 	if (pos < 0 || pos >= UI_QUICK_TILES)
 		return QT_POWER;
+#if CONFIG_BCAST_FM
+	// On the HF broadcast receiver, tiles 2 and 3 (squelch, tone - both meaningless here) become the demod override
+	// and the SSB fine-tune.
+	if (v->bcast) {
+		if (pos == 1)
+			return QT_HFMODE;
+		if (pos == 2)
+			return QT_HFBFO;
+	}
+#endif
 	if (!v->vfo && pos == 3)
 		return QT_TO_VFO;	// a channel's tile 4 copies it to the VFO; the VFO's stays Mode
 	return v->ch.mode == RADIO_MODE_DMR ? dmr[pos] : fm[pos];
@@ -2636,6 +2665,7 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 		[QT_BRIGHTNESS] = "Bright", [QT_TIMESLOT] = QT_NAME("Timeslot", "Slot"), [QT_CC] = "Color",
 		[QT_HEAR_ALL] = QT_NAME("Digital monitor", "DMon"), [QT_PRIVACY] = QT_NAME("Privacy", "Priv"),
 		[QT_TALK_TO] = QT_NAME("Talk to", "Talk"), [QT_TO_VFO] = QT_NAME("Copy to VFO", "To VFO"),
+		[QT_HFMODE] = "Mode", [QT_HFBFO] = QT_NAME("Fine tune", "Fine"),
 	};
 #undef QT_NAME
 	uint8_t kind = ui_quick_kind(tile, v);
@@ -2714,6 +2744,21 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 		sb_u32(&b, s->brightness, 1);
 		sb_chr(&b, '%');
 		return true;
+#if CONFIG_BCAST_FM
+	case QT_HFMODE:
+		switch (v->bcast_override) {
+		case 1: sb_str(&b, "AM"); break;
+		case 2: sb_str(&b, "LSB"); break;
+		case 3: sb_str(&b, "USB"); break;
+		default: sb_str(&b, "Auto"); break;
+		}
+		return v->bcast;
+	case QT_HFBFO:
+		if (v->bcast_bfo > 0)
+			sb_chr(&b, '+');
+		sb_i32(&b, v->bcast_bfo);
+		return v->bcast;
+#endif
 #if CONFIG_DMR
 	case QT_TIMESLOT:
 		sb_str(&b, "TS");

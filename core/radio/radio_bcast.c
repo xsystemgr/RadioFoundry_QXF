@@ -30,13 +30,32 @@ bool radio_bcast_tx_refused(uint32_t hz)
 	return radio_bcast_band(hz);
 }
 
+// A fine grid (HF/SSB on the Si4732, grid_khz 1-5) steps on that grid - 1 kHz for ham voice - rather than the
+// broadcast 100/200 kHz channel spacing.
+static uint32_t bcast_fine_step_hz(void)
+{
+	if (board.bcast != NULL && board.bcast->grid_khz != 0 && board.bcast->grid_khz <= 5u) {
+		return (uint32_t)board.bcast->grid_khz * 1000u;
+	}
+	return 0;
+}
+
 uint32_t radio_bcast_step_hz(uint8_t setting)
 {
+	uint32_t fine = bcast_fine_step_hz();
+	if (fine != 0) {
+		return fine;
+	}
 	return setting == RADIO_BCAST_STEP_100 ? RADIO_BCAST_STEP_HZ : 2u * RADIO_BCAST_STEP_HZ;
 }
 
 uint32_t radio_bcast_step(uint32_t hz, int dir, uint8_t setting)
 {
+	uint32_t fine = bcast_fine_step_hz();
+	if (fine != 0) {
+		int64_t f = (int64_t)hz + (int64_t)dir * (int64_t)fine;
+		return f < 0 ? 0 : f > (int64_t)UINT32_MAX ? UINT32_MAX : (uint32_t)f;
+	}
 	if (setting == RADIO_BCAST_STEP_100) {
 		int64_t next = (int64_t)hz + (int64_t)dir * RADIO_BCAST_STEP_HZ;
 		return next < 0 ? 0 : next > (int64_t)UINT32_MAX ? UINT32_MAX : (uint32_t)next;

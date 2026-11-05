@@ -54,6 +54,18 @@ void at32_pin_input_floating(uint32_t port, unsigned pin)
 	REG(port + 0x0Cu) &= ~(3u << (pin * 2));
 	at32_irq_restore(state);
 }
+void at32_pin_input_pullup(uint32_t port, unsigned pin)
+{
+	uint32_t state = at32_irq_save();
+	clock_on(port);
+	REG(port) &= ~(3u << (pin * 2));	// input mode
+	REG(port + 0x0Cu) = (REG(port + 0x0Cu) & ~(3u << (pin * 2))) | (1u << (pin * 2)); // pull-up
+	at32_irq_restore(state);
+}
+uint16_t at32_port_inputs(uint32_t port)
+{
+	return (uint16_t)(REG(port + 0x10u) & 0xFFFFu);
+}
 bool at32_pin_read(uint32_t port, unsigned pin)
 {
 	return (REG(port + 0x10u) & (1u << pin)) != 0;

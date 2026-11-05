@@ -1105,6 +1105,11 @@ static void quick_change(uint8_t kind, int8_t dir)
 		ui_st.brightness = (uint8_t)(b < 10 ? 10 : b > 100 ? 100 : b);
 		break;
 	}
+#if CONFIG_BCAST_FM
+	case QT_HFBFO:
+		radio_req_bcast_bfo(dir > 0 ? 1 : -1);	// SSB fine-tune up / down
+		break;
+#endif
 	default:
 		break;
 	}
@@ -1237,6 +1242,16 @@ static void quick_activate(int tile)
 		ui_toast(msg);
 		break;
 	}
+#if CONFIG_BCAST_FM
+	case QT_HFMODE:
+		radio_req_bcast_mode();		// cycles Auto -> AM -> LSB -> USB; the tile shows the result
+		ui_toast("Mode: Auto/AM/LSB/USB");
+		break;
+	case QT_HFBFO:
+		ui_st.quick_edit = true;	// up/down nudge the SSB fine-tune (BFO)
+		ui_toast("Up/Dn: fine tune");
+		break;
+#endif
 	default:	// value tiles: squelch, brightness
 		ui_st.quick_edit = true;
 		break;

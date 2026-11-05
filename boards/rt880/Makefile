@@ -3,24 +3,42 @@
 # Experimental entry point, intentionally absent from the release/flasher registry.
 # Run from the repository root: make -f boards/rt880/Makefile
 .DEFAULT_GOAL := all
+# HF=1 builds the Si4732 broadcast/HF image: the HF receiver appears as a second VFO (CONFIG_BCAST_FM), keeping the
+# dual-watch so it shows as a real second VFO, but dropping the RAM-heavy DM-32 fonts so the broadcast stack fits.
+# The default build keeps the DM-32 fonts and leaves the Si4732 out. The two configs use separate build directories
+# so their objects (compiled with different CONFIG_BCAST_FM) never clobber each other.
+ifeq ($(HF),1)
+BUILD := build/rt880-lab-hf
+RT880_FEATURES := FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN CHANNEL_LIST AM_RX BCAST_FM DUAL_WATCH FONT_AA
+TARGET := $(BUILD)/rfoundry_rt880_HF_si4732_UNTESTED
+# The Si4732 keeps 0.15-24 MHz (AM/SW); 24-30 MHz (CB/10 m) is left to the BK4819 for narrowband FM (see route()).
+# CONFIG_SI4732_SSB pulls in the SSB patch (ham voice on HF; third-party patch, personal use - see si4732_ssb_patch.h).
+HF_DEFS := -DSI4732_HI_KHZ=24000u -DCONFIG_SI4732_SSB=1
+else
 BUILD := build/rt880-lab
+RT880_FEATURES := FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN KEY_ASSIGN CHANNEL_LIST AM_RX DUAL_WATCH FONT_XL FONT_AA FONT_BIG
 TARGET := $(BUILD)/rfoundry_rt880_rx_speaker_fix5_UNTESTED
+HF_DEFS :=
+endif
 ARM_GCC_DIR ?= $(firstword $(wildcard $(HOME)/opt/arm-gnu-toolchain-*-arm-none-eabi/bin/) /usr/bin/)
 CROSS ?= $(ARM_GCC_DIR)arm-none-eabi-
 CC := $(CROSS)gcc
 FEATURE_NAMES := $(shell python3 -c 'from pathlib import Path; print(Path("config/features.mk").read_text().split("FEATURES :=",1)[1].split("\n\n",1)[0].replace(chr(92)," "))')
 $(foreach f,$(FEATURE_NAMES),$(eval CONFIG_$(f) := n))
-$(foreach f,FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN KEY_ASSIGN CHANNEL_LIST,$(eval CONFIG_$(f) := y))
+$(foreach f,$(RT880_FEATURES),$(eval CONFIG_$(f) := y))
 include config/features.mk
 DIRS := core/app core/radio core/ui core/input core/codeplug core/settings core/storage \
 	platform/at32f423 boards/rt880 drivers/display/st7789 drivers/rf/bk4819 drivers/rf/subaudio
+ifeq ($(HF),1)
+DIRS += drivers/bcast/si4732 drivers/bus/i2c_gpio
+endif
 SRC := $(foreach d,$(DIRS),$(wildcard $(d)/*.c))
 SRC := $(filter-out core/app/task_stack.c core/app/watchdog.c,$(SRC))
 RTOS := third_party/FreeRTOS-Kernel
 SRC += $(addprefix $(RTOS)/,tasks.c queue.c list.c timers.c event_groups.c portable/GCC/ARM_CM4F/port.c portable/MemMang/heap_4.c)
 OBJ := $(addprefix $(BUILD)/,$(SRC:.c=.o)) $(BUILD)/platform/at32f423/startup.o
 CPU := -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
-DEFS := $(FEATURE_DEFS) -DGFX_INDEXED=1 -DGFX_FB_BYTES=9600u -DGFX_MAX_ROWS=160u \
+DEFS := $(FEATURE_DEFS) $(HF_DEFS) -DGFX_INDEXED=1 -DGFX_FB_BYTES=9600u -DGFX_MAX_ROWS=160u \
 	-DRFOUNDRY_BOARD_ID=\"rt880-lab\" -DRFOUNDRY_GIT=\"private-lab\"
 INC := -Ihal -Icore -Idrivers -Iboards/rt880 -Iplatform/at32f423 -I$(BUILD)/gen -I$(RTOS)/include -I$(RTOS)/portable/GCC/ARM_CM4F
 CFLAGS := $(CPU) -Os -g3 -std=gnu11 -ffunction-sections -fdata-sections -fno-common -flto=auto -fcallgraph-info=su -MMD -MP \
@@ -44,14 +62,20 @@ image: $(TARGET).elf
 	$(CROSS)objcopy -O binary $< $(TARGET).bin
 test:
 	@mkdir -p $(BUILD)
-	cc -std=c11 -Wall -Wextra -Werror -Ihal -Icore -Idrivers -Iplatform/at32f423 \
+	cc -std=c11 -Wall -Wextra -Werror -DCONFIG_BCAST_FM=0 -Ihal -Icore -Idrivers -Iplatform/at32f423 \
 		boards/rt880/board.c boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c drivers/display/st7789/st7789.c core/input/input_engine.c boards/rt880/tests/board_test.c -o $(BUILD)/board-test
 	$(BUILD)/board-test
-	cc -std=c11 -Wall -Wextra -Werror -Ihal -Icore -Idrivers -Iplatform/at32f423 \
+	cc -std=c11 -Wall -Wextra -Werror -DCONFIG_BCAST_FM=0 -Ihal -Icore -Idrivers -Iplatform/at32f423 \
 		boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c boards/rt880/tests/radio_test.c -o $(BUILD)/radio-test
 	$(BUILD)/radio-test
+# The Si4732 HF driver and its bit-banged I2C transport, host-side with a mock chip.
+test-hf:
+	@mkdir -p $(BUILD)
+	cc -std=c11 -Wall -Wextra -Werror -Ihal -Icore -Idrivers \
+		drivers/bcast/si4732/si4732.c boards/rt880/tests/si4732_test.c -o $(BUILD)/si4732-test
+	$(BUILD)/si4732-test
 stack-check: $(TARGET).elf
 	python3 tools/stack_check.py --build $(BUILD) --label rt880-lab --cc '$(CC)' \
 		--cflags '$(CFLAGS)' --elf $(TARGET).elf --overhead 208
 -include $(OBJ:.o=.d)
-.PHONY: all image test stack-check
+.PHONY: all image test test-hf stack-check

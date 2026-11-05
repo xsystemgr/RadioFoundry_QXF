@@ -14,6 +14,15 @@
 
 #define BCAST_VOLUME_MAX	15	// volume() levels 0..15 (0 = silent)
 
+// How the broadcast receiver is demodulating, for display. FM for a broadcast-FM tuner; AM/LSB/USB for an HF receiver
+// like the Si4732 (LSB/USB need its SSB patch).
+typedef enum {
+	BCAST_DEMOD_FM = 0,
+	BCAST_DEMOD_AM = 1,
+	BCAST_DEMOD_LSB = 2,
+	BCAST_DEMOD_USB = 3,
+} bcast_demod_t;
+
 typedef struct {
 	uint32_t khz;		// the frequency the receiver is on now (follows a seek as it runs)
 	bool tuning;		// a tune or a seek still runs
@@ -21,6 +30,7 @@ typedef struct {
 	bool stereo;		// stereo pilot received
 	bool station;		// the receiver judges this a station (its own threshold)
 	uint8_t rssi;		// signal strength in the chip's units (RDA5807M: 0..127, about dBuV)
+	uint8_t demod;		// bcast_demod_t: how it is demodulating now (for the mode label)
 } bcast_status_t;
 
 typedef struct {
@@ -39,6 +49,11 @@ typedef struct {
 	// Broadcast audio to the speaker (true) or muted (false). The core keeps hal_radio's audio() off while this is on;
 	// a board whose two paths share a switch may still let the channel win
 	void (*audio)(bool on);
+	// Optional, HF receivers only (NULL on a plain broadcast-FM tuner): force the demod (0 = auto by frequency,
+	// 1 = AM, 2 = LSB, 3 = USB) and set the SSB fine-tune (BFO) offset in Hz. The core keeps the chosen values and
+	// re-applies them; a board without these leaves them NULL and the core hides the controls.
+	void (*set_demod)(uint8_t mode);
+	void (*set_bfo)(int16_t hz);
 } hal_bcast_t;
 
 #endif

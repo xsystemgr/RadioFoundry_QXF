@@ -33,6 +33,11 @@ bool radio_bcast_band(uint32_t hz);
 bool radio_bcast_channel(const channel_t *ch);
 // Transmitting on hz is refused because it is in the broadcast receiver's range
 bool radio_bcast_tx_refused(uint32_t hz);
+
+// SSB fine-tune (BFO) on an HF receiver: step per key press, and the clamp either side of the 1 kHz grid point
+#define RADIO_BCAST_BFO_STEP_HZ		20
+#define RADIO_BCAST_BFO_MAX_HZ		900
+
 // The VFO's automatic step in the broadcast band for radio_settings_t.bcast_step
 uint32_t radio_bcast_step_hz(uint8_t setting);
 // The VFO's next frequency from hz, dir -1 or 1, for radio_settings_t.bcast_step. RADIO_BCAST_STEP_200_ODD goes to the

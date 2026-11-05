@@ -5,9 +5,18 @@
 #include <stdio.h>
 #include <string.h>
 #include "../radio.h"
+#include "board.h"
 #include "platform.h"
 #include "reset_policy.h"
 #include "rf/bk4819/bk4819.h"
+
+// Minimal board for board_in_band(): the same bands as boards/rt880/board.c.
+static const band_t test_bands[] = {
+	{ 108000000, 137000000, false },
+	{ 136000000, 174000000, true },
+	{ 400000000, 480000000, true },
+};
+const board_t board = { .bands = test_bands, .band_count = 3 };
 
 typedef struct {
 	bool cs, driving, reading;
@@ -31,10 +40,13 @@ static void select_chip(unsigned index, bool high)
 		assert(c->bits == 24);
 		unsigned reg = (c->shift >> 16) & 0x7F;
 		uint16_t value = (uint16_t)c->shift;
-		if (reg == 0x36) assert(value == 0);
-		if (reg == 0x30) {
-			assert((value & 0x400Eu) == 0); // PA gain, microphone ADC and TX DSP bits stay clear
-			if (index == 0) assert(value == 0); // bus_a is the idle control chip
+		// The control chip (bus_a = index 0) never transmits: its PA stays off and
+		// its enables never set the PA / mic-ADC / TX-DSP bits. The receiver (index 1)
+		// may transmit, so it is allowed PA bias and TX enables.
+		if (reg == 0x36 && index == 0) assert(value == 0);
+		if (reg == 0x30 && index == 0) {
+			assert((value & 0x400Eu) == 0);
+			assert(value == 0);
 		}
 		if (reg == 0x33) {
 			// Band-select GPIO is written on the receiver (bus_b = index 1).
@@ -157,15 +169,37 @@ int main(void)
 		assert(rt880_radio.rx(edges[i], RADIO_BW_25K, NULL));
 		assert(chips[1].regs[0x33] == (i < 2 ? 0x10 : 0x20));
 	}
+	// AM receive in the aeronautical band: AF select 7 (0x6740) and AFC off (reg 0x73 bit 4).
+	assert(rt880_radio.rx_am != NULL);
+	assert(rt880_radio.rx_am(118000000, RADIO_BW_25K) && chips[1].regs[0x33] == 0x10);
+	assert((chips[1].regs[0x73] & 0x0010) != 0);
+	rt880_radio.audio(true);
+	assert(chips[1].regs[0x47] == 0x6740 && pins[2][4] == 0 && pins[5][8]);
+	assert(!rt880_radio.rx_am(90000000, RADIO_BW_25K)); // below the air band
+	assert(rt880_radio.rx(145500000, RADIO_BW_25K, NULL)); // back to FM clears AM AF
+	rt880_radio.audio(true);
+	assert(chips[1].regs[0x47] == BK4819_AF_FM);
 	unsigned before = gpio_writes;
 	for (uint32_t hz = 1000000; hz <= 1000000000; hz += 1000000) {
-		if ((hz < 136000000 || hz > 174000000) && (hz < 400000000 || hz > 480000000))
+		bool valid = (hz >= 108000000 && hz <= 174000000) || (hz >= 400000000 && hz <= 480000000);
+		if (!valid)
 			assert(!rt880_radio.rx(hz, RADIO_BW_25K, NULL));
 	}
 	subtone_t tone = { .type = TONE_CTCSS, .value = 885 };
 	assert(!rt880_radio.rx(145500000, RADIO_BW_25K, &tone));
 	assert(gpio_writes == before);
-	tx_is_blocked();
+	// TX: allowed in the VHF/UHF ham ranges, refused in the air band and out of band.
+	assert(rt880_radio.rx(145500000, RADIO_BW_25K, NULL));
+	assert(rt880_radio.tx(145500000, RADIO_BW_25K, 0, NULL));	// VHF, LO
+	assert(chips[1].regs[0x30] == BK4819_STATE_TX_MAIN);
+	assert((chips[1].regs[0x36] & 0x80u) != 0 && chips[0].regs[0x36] == 0);	// receiver PA on, control off
+	assert(pins[5][0]);						// VHF -> PF0 high
+	rt880_radio.tx_off();
+	assert(chips[1].regs[0x30] == BK4819_STATE_RX && !pins[5][0]);	// back to RX, relay low
+	assert(rt880_radio.tx(433500000, RADIO_BW_25K, 1, NULL) && !pins[5][0]);	// UHF, HI -> PF0 low
+	rt880_radio.tx_off();
+	assert(!rt880_radio.tx(118000000, RADIO_BW_25K, 0, NULL));	// air band: TX refused (aviation)
+	assert(!rt880_radio.tx(90000000, RADIO_BW_25K, 0, NULL));	// out of band
 	rt880_radio.set_mode(RADIO_MODE_DMR);
 	assert(!rt880_radio.rx(145500000, RADIO_BW_25K, NULL));
 	rt880_radio.set_mode(RADIO_MODE_FM);
@@ -197,6 +231,6 @@ int main(void)
 	rt880_radio.audio(true);
 	assert(!pins[2][4] && pins[5][8] && chips[1].regs[0x47] == BK4819_AF_FM);
 	assert(critical_depth == 0);
-	printf("radio-test: RX routes/tuning/status/audio, ID failures and fault shutdown passed (%u frames); TX always denied\n", frames);
+	printf("radio-test: RX routes/tuning/status/audio, ID failures and fault shutdown passed (%u frames); TX in-band allowed, air band + OOB refused\n", frames);
 	return 0;
 }

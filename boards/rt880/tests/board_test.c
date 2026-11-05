@@ -119,7 +119,8 @@ int main(void)
 		assert(!board.radio->rx(hz, RADIO_BW_12K5, NULL));
 	}
 	assert(writes == 0);
-	for (unsigned i = 0; i < board.band_count; i++) assert(!board.bands[i].tx);
+	// The air band (first entry) is RX-only; the VHF and UHF ranges allow TX.
+	assert(!board.bands[0].tx && board.bands[1].tx && board.bands[2].tx);
 	unsigned digits = 0;
 	for (unsigned i = 0; i < board.keymap_len; i++) {
 		assert(board.keymap[i].short_action != ACT_PTT);

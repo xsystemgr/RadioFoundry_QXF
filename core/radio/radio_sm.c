@@ -460,6 +460,7 @@ static void bcast_status(radio_sm_t *sm, radio_status_t *st)
 	bool got = sm->bcast_on && board.bcast->status(&bs);
 	uint8_t rssi = got ? bs.rssi : 0;
 	sm->view.bcast_khz = got ? bs.khz : 0;
+	sm->view.bcast_demod = got ? bs.demod : BCAST_DEMOD_FM;
 	st->rssi_dbm = (int16_t)(rssi + RADIO_BCAST_DBUV_DBM);
 	st->noise = radio_bcast_noise(rssi);
 	st->carrier = false;
@@ -5243,6 +5244,31 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 	case RREQ_DTMF:
 		dtmf_key(sm, (char)(req->arg & 0xFF), (req->arg & 0x100) != 0, now_ms);
 		break;
+#endif
+#if CONFIG_BCAST_FM
+	case RREQ_BCAST_MODE:
+		// Cycle the HF demod override: AUTO -> AM -> LSB -> USB -> AUTO. The HAL re-tunes so it takes effect now.
+		if (board.bcast != NULL && board.bcast->set_demod != NULL) {
+			sm->bcast_override = (uint8_t)((sm->bcast_override + 1u) & 3u);
+			board.bcast->set_demod(sm->bcast_override);
+			sm->view.bcast_override = sm->bcast_override;
+		}
+		break;
+	case RREQ_BCAST_BFO: {
+		// SSB fine-tune: nudge the BFO in RADIO_BCAST_BFO_STEP_HZ steps, clamped to +/- RADIO_BCAST_BFO_MAX_HZ.
+		if (board.bcast != NULL && board.bcast->set_bfo != NULL) {
+			int bfo = (int)sm->bcast_bfo + (int)req->arg * RADIO_BCAST_BFO_STEP_HZ;
+			if (bfo > RADIO_BCAST_BFO_MAX_HZ) {
+				bfo = RADIO_BCAST_BFO_MAX_HZ;
+			} else if (bfo < -RADIO_BCAST_BFO_MAX_HZ) {
+				bfo = -RADIO_BCAST_BFO_MAX_HZ;
+			}
+			sm->bcast_bfo = (int16_t)bfo;
+			board.bcast->set_bfo(sm->bcast_bfo);
+			sm->view.bcast_bfo = sm->bcast_bfo;
+		}
+		break;
+	}
 #endif
 	default:
 		break;
