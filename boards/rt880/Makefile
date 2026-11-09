@@ -9,14 +9,20 @@
 # so their objects (compiled with different CONFIG_BCAST_FM) never clobber each other.
 ifeq ($(HF),1)
 BUILD := build/rt880-lab-hf
-RT880_FEATURES := FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN CHANNEL_LIST AM_RX BCAST_FM DUAL_WATCH FONT_AA
+RT880_FEATURES := FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN CHANNEL_LIST AM_RX BCAST_FM FONT_AA
 TARGET := $(BUILD)/rfoundry_rt880_HF_si4732_UNTESTED
 # The Si4732 keeps 0.15-24 MHz (AM/SW); 24-30 MHz (CB/10 m) is left to the BK4819 for narrowband FM (see route()).
 # CONFIG_SI4732_SSB pulls in the SSB patch (ham voice on HF; third-party patch, personal use - see si4732_ssb_patch.h).
 HF_DEFS := -DSI4732_HI_KHZ=24000u -DCONFIG_SI4732_SSB=1
+# ANTPROBE=1: a bench diagnostic that cycles candidate GPIOs (HIGH/LOW) to find the HF antenna / LNA switch the
+# factory drives but we don't - tune a strong MW/SW station and watch the HF RSSI (diag) jump on the right pin.
+ifeq ($(ANTPROBE),1)
+HF_DEFS += -DRT880_HF_ANTPROBE
+TARGET := $(BUILD)/rfoundry_rt880_HF_ANTPROBE_UNTESTED
+endif
 else
 BUILD := build/rt880-lab
-RT880_FEATURES := FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN KEY_ASSIGN CHANNEL_LIST AM_RX DUAL_WATCH FONT_XL FONT_AA FONT_BIG
+RT880_FEATURES := FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN CHANNEL_LIST AM_RX BCAST_FM DUAL_WATCH
 TARGET := $(BUILD)/rfoundry_rt880_rx_speaker_fix5_UNTESTED
 HF_DEFS :=
 endif
@@ -29,8 +35,16 @@ $(foreach f,$(RT880_FEATURES),$(eval CONFIG_$(f) := y))
 include config/features.mk
 DIRS := core/app core/radio core/ui core/input core/codeplug core/settings core/storage \
 	platform/at32f423 boards/rt880 drivers/display/st7789 drivers/rf/bk4819 drivers/rf/subaudio
-ifeq ($(HF),1)
+# The Si4732 broadcast/HF driver and its bit-banged I2C transport come in whenever the broadcast VFO
+# is enabled (CONFIG_BCAST_FM) - both the default speaker-fix image and the HF=1 image use it - so the
+# core/board references to si4732_hal always have a definition to link against.
+ifeq ($(CONFIG_BCAST_FM),y)
 DIRS += drivers/bcast/si4732 drivers/bus/i2c_gpio
+endif
+# MSG=1: the GOGUFW-compatible analog messenger (BK4819 FSK). Build on the lean HF base: make HF=1 MSG=1 image
+ifeq ($(MSG),1)
+DIRS += core/messenger
+TARGET := $(BUILD)/rfoundry_rt880_MSG_UNTESTED
 endif
 SRC := $(foreach d,$(DIRS),$(wildcard $(d)/*.c))
 SRC := $(filter-out core/app/task_stack.c core/app/watchdog.c,$(SRC))
@@ -39,6 +53,7 @@ SRC += $(addprefix $(RTOS)/,tasks.c queue.c list.c timers.c event_groups.c porta
 OBJ := $(addprefix $(BUILD)/,$(SRC:.c=.o)) $(BUILD)/platform/at32f423/startup.o
 CPU := -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 DEFS := $(FEATURE_DEFS) $(HF_DEFS) -DGFX_INDEXED=1 -DGFX_FB_BYTES=9600u -DGFX_MAX_ROWS=160u \
+	-DCONFIG_MESSENGER=$(if $(filter 1,$(MSG)),1,0) \
 	-DRFOUNDRY_BOARD_ID=\"rt880-lab\" -DRFOUNDRY_GIT=\"private-lab\"
 INC := -Ihal -Icore -Idrivers -Iboards/rt880 -Iplatform/at32f423 -I$(BUILD)/gen -I$(RTOS)/include -I$(RTOS)/portable/GCC/ARM_CM4F
 CFLAGS := $(CPU) -Os -g3 -std=gnu11 -ffunction-sections -fdata-sections -fno-common -flto=auto -fcallgraph-info=su -MMD -MP \
@@ -74,8 +89,17 @@ test-hf:
 	cc -std=c11 -Wall -Wextra -Werror -Ihal -Icore -Idrivers \
 		drivers/bcast/si4732/si4732.c boards/rt880/tests/si4732_test.c -o $(BUILD)/si4732-test
 	$(BUILD)/si4732-test
+# The GOGUFW-compatible GGM2 messenger packet (wire layout + CRC) and the in-RAM message store, host-side.
+test-msg:
+	@mkdir -p $(BUILD)
+	cc -std=c11 -Wall -Wextra -Werror -Icore \
+		core/messenger/msg_packet.c core/messenger/msg_fsk.c core/messenger/tests/msg_packet_test.c -o $(BUILD)/msg-packet-test
+	$(BUILD)/msg-packet-test
+	cc -std=c11 -Wall -Wextra -Werror -Icore \
+		core/messenger/msg_store.c core/messenger/msg_packet.c core/messenger/tests/msg_store_test.c -o $(BUILD)/msg-store-test
+	$(BUILD)/msg-store-test
 stack-check: $(TARGET).elf
 	python3 tools/stack_check.py --build $(BUILD) --label rt880-lab --cc '$(CC)' \
 		--cflags '$(CFLAGS)' --elf $(TARGET).elf --overhead 208
 -include $(OBJ:.o=.d)
-.PHONY: all image test test-hf stack-check
+.PHONY: all image test test-hf test-msg stack-check

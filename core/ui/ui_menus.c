@@ -19,6 +19,9 @@
 #if CONFIG_HOTSPOT || CONFIG_USB_NETWORK
 #include "hostlink/hostlink.h"
 #endif
+#if CONFIG_MESSENGER
+#include "messenger/msg_store.h"
+#endif
 #include "rfoundry_about.h"
 #if CONFIG_SFR
 #include "dmr/sfr.h"
@@ -72,6 +75,16 @@ static void hub_item(uint16_t i, ui_item_t *it)
 	item_num(it, e);
 	sbuf_t b;
 	sb_init(&b, it->value, sizeof it->value);
+#if CONFIG_MESSENGER
+	if (e == HUB_MESSAGES) {
+		uint8_t unread = msg_store_unread();
+		if (unread) {
+			sb_u32(&b, unread, 1);
+			sb_str(&b, " new");
+			it->flags |= UI_ITEM_WARN;
+		}
+	} else
+#endif
 	if (e == HUB_MESSAGES && ui_st.unread) {
 		sb_u32(&b, ui_st.unread, 1);
 		sb_str(&b, " new");
@@ -106,6 +119,12 @@ static void hub_select(uint16_t i, bool hold)
 		ui_toast("Channels: not in this build");	// the numbers stay the same in every build
 		return;
 	}
+#if CONFIG_MESSENGER
+	if (e == HUB_MESSAGES) {		// "Messages" opens the analog FSK messenger instead of the DMR inbox
+		ui_push(SCR_MSGR, 0);
+		return;
+	}
+#endif
 	ui_push(scr[e], 0);
 }
 
@@ -4785,6 +4804,11 @@ const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 	[SCR_VOLUME] = &volume_screen,
 #if CONFIG_DMR
 	[SCR_DMR_ID] = &dmr_id_screen,
+#endif
+#if CONFIG_MESSENGER
+	[SCR_MSGR] = &msgr_home_screen, [SCR_MSGR_LIST] = &msgr_list_screen,
+	[SCR_MSGR_READ] = &msgr_read_screen, [SCR_MSGR_HEARD] = &msgr_heard_screen,
+	[SCR_MSGR_COMPOSE] = &msgr_compose_screen,
 #endif
 #if CONFIG_CHANNEL_LIST
 	[SCR_CHANNELS] = &chlist_screen, [SCR_CHANNEL] = &chinfo_screen,

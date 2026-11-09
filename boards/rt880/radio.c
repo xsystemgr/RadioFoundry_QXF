@@ -9,6 +9,13 @@
 #include "platform.h"
 #include "hal_time.h"
 #include "rf/bk4819/bk4819.h"
+#if CONFIG_MESSENGER
+#include "rf/bk4819/bk4819_fsk.h"
+#include "messenger/msg_packet.h"
+#include "messenger/msg_fsk.h"
+#include "messenger/msg_store.h"
+#include "messenger/msg_radio.h"
+#endif
 
 static bk4819_t receiver, control;
 static uint16_t receiver_id, control_id;
@@ -74,8 +81,9 @@ void rt880_rf_halt(void)
 	ready = tuned = audio_requested = audio_open = bcast_audio_want = false;
 	at32_pin_output(AT32_GPIO_C, 4, true); // observed audio mute
 	at32_pin_output(AT32_GPIO_F, 8, false); // observed speaker gate off
-	at32_pin_output(AT32_GPIO_C, 15, false); // never HF TX
-	at32_pin_output(AT32_GPIO_F, 0, false); // keep HF relay path inactive
+	at32_pin_output(AT32_GPIO_C, 15, false); // RF front-end select (stock: low for VHF/UHF)
+	at32_pin_output(AT32_GPIO_B, 11, false); // RF front-end select (stock rf_path_set: low for VHF/UHF)
+	at32_pin_output(AT32_GPIO_F, 0, false); // band relay (stock: low for the 2 m / 70 cm paths)
 	at32_pin_output(AT32_GPIO_C, 7, true);
 	at32_pin_output(AT32_GPIO_A, 8, true);
 	if (started) {
@@ -248,13 +256,18 @@ static bool rx_am(uint32_t hz, radio_bw_t bw)
 	return do_tune(hz, bw, true);
 }
 #endif
-// reg 0x36 PA bias/gain: bit 7 enables the PA, bits 0-6 are the level. The factory
-// reads the level from per-band calibration; until that is parsed these are
-// deliberately conservative lab levels, well under BK4819_PA_MAX (0xBF). Test into
-// a dummy load first.
+// BK4819 REG 0x36 is 16-bit: the HIGH byte is the PA bias - the current into the final that actually sets the output
+// power - and the LOW byte is the enable bit (7) plus the gain select. The stock radio keys TX with (bias << 8) | 0xFF
+// and takes the bias from per-band calibration. An earlier version wrote only the low byte, leaving the bias at 0, so
+// the PA was "on" but radiated nothing (confirmed on hardware: TX stored to Sent yet no carrier). These are deliberately
+// conservative lab bias levels, well under full scale (0xFF high byte). Transmit into a proper antenna or dummy load.
 static uint16_t tx_pa_word(uint8_t power)
 {
-	return power >= 1 ? (uint16_t)(0x80u | 0x20u) : (uint16_t)(0x80u | 0x08u);
+	// First-light bias levels, kept deliberately LOW while the RF antenna path is validated on hardware - just enough
+	// to confirm a carrier, far below the stock per-band calibration. Raise only once the path is proven and into a
+	// proper antenna / dummy load.
+	uint16_t bias = power >= 1 ? 0x18u : 0x10u;	// HI / LO (minimal)
+	return (uint16_t)((bias << 8) | 0xFFu);		// bias in the high byte, enable + full gain select in the low
 }
 static bool transmit(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
 {
@@ -274,9 +287,16 @@ static bool transmit(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t 
 	audio(false);
 	bk4819_set_af(&receiver, BK4819_AF_MUTE);
 	bk4819_set_state(&receiver, BK4819_STATE_IDLE);
-	bk4819_write(&receiver, 0x33, path);
-	// Factory TX band-path relay (PF0): low for the higher band (UHF), high for VHF.
-	at32_pin_write(AT32_GPIO_F, 0, path != 0x20);
+	// Faithful stock (V1.16) TX antenna / front-end state, reverse-engineered from the factory rf_path_set + T/R
+	// control. For both ham bands the RF front-end selects PC15 and PB11 are driven LOW and the band relay PF0 is LOW;
+	// BK4819 REG 0x33 selects the front-end filter (VHF = bit 3 = 0x08, UHF = bit 2 = 0x04) OR'd with the antenna T/R
+	// bit (0x10), which the stock raises only while transmitting. The earlier build never drove PC15/PB11 and toggled
+	// PF0 the wrong way, so the antenna never reached the PA output (only a relay click, no carrier).
+	bool uhf = hz >= 400000000u;
+	at32_pin_write(AT32_GPIO_C, 15, false);
+	at32_pin_write(AT32_GPIO_B, 11, false);
+	at32_pin_write(AT32_GPIO_F, 0, false);
+	bk4819_write(&receiver, 0x33, (uint16_t)((uhf ? 0x04u : 0x08u) | 0x10u));
 	bk4819_tx_prepare(&receiver, tt, tv);		// deviation and sub-audio
 	bk4819_write(&receiver, BK4819_REG_PA, tx_pa_word(power));
 	bk4819_tx_tune(&receiver, hz);			// freq, POWER_ON, STATE_TX_MAIN
@@ -295,6 +315,146 @@ static void tx_off(void)
 	do_tune(frequency, tx_bw, am_mode);		// re-establish RX on the same frequency
 	audio_apply();
 }
+#if CONFIG_MESSENGER
+// GOGUFW-compatible analog messenger on the channel receiver (the BK4819 does the 1.2k FSK in hardware). RX arms the
+// FSK modem and polls for a GGM2 frame; TX keys the transmitter on the current frequency and sends one frame, then
+// returns to RX. The receiver is shared, so FSK RX and normal FM audio do not run at the same time.
+static char msg_call[MSG_CALLSIGN_LEN + 1] = "RT880";
+static msg_packet_t msg_rx;
+static bool msg_rx_valid;	// a valid frame has been decoded at least once (msg_rx holds the latest)
+static bool msg_rx_new;		// a new frame decoded since the last rt880_msg_poll() (UI edge)
+static bool msg_rx_armed;
+static uint16_t msg_rx_words[MSG_FSK_WORDS];	// incremental capture buffer, drained from status()
+static unsigned msg_rx_count;			// words captured so far in the frame in progress
+static uint16_t msg_tx_id = 1;
+// TX queue: the UI task hands a message here; the actual keying runs in rt880_msg_service() (the radio task) so only one
+// task ever drives the BK4819 SPI. The flag is set last, after the text, so the radio task never reads a half-written
+// buffer.
+static volatile bool msg_tx_pending;
+static char msg_tx_text[MSGR_TEXT_LEN + 1];
+
+// Perform one queued transmit, in the radio-task context. Keys TX on the current frequency, sends the GGM2 frame, and
+// returns to RX. A sent frame is copied to the Sent box; one that could not be keyed (out of a TX band) goes to Drafts.
+static void msg_tx_run(void)
+{
+	uint8_t pkt[MSG_PKT_WIRE_LEN];
+	bool ok = false;
+	if (msg_packet_build_text(pkt, sizeof pkt, msg_tx_id++, msg_call, msg_tx_text, 3) == MSG_PKT_WIRE_LEN) {
+		uint16_t w[MSG_FSK_WORDS];
+		msg_fsk_pack(w, pkt);
+		bool was_armed = msg_rx_armed;
+		msg_rx_armed = false;
+		if (transmit(frequency, tx_bw, 1, NULL)) {	// key TX (refused out of a TX band)
+			bk4819_fsk_setup(&receiver);
+			ok = bk4819_fsk_tx(&receiver, w, MSG_FSK_WORDS);
+			tx_off();
+		}
+		if (was_armed) {
+			rt880_msg_rx_arm();			// back to listening
+		}
+	}
+	if (ok) {
+		msg_store_add_sent(msg_tx_text);
+	} else {
+		msg_store_add_draft(msg_tx_text);	// couldn't key here - keep it so the user can retry elsewhere
+	}
+	msg_tx_pending = false;
+}
+
+// Drain the FSK FIFO incrementally - called from status() every radio poll (25 ms), fast enough that the 8-byte FIFO
+// never overruns at 1200 baud. On a completed frame it unpacks, parses, and latches the message, then restarts capture.
+// Also runs any queued transmit first, so all BK4819 access stays on this (the radio) task.
+void rt880_msg_service(void)
+{
+	if (!ready) {
+		return;
+	}
+	if (msg_tx_pending) {
+		msg_tx_run();
+		return;
+	}
+	if (transmitting || !msg_rx_armed) {
+		return;
+	}
+	if (!bk4819_fsk_rx_service(&receiver, msg_rx_words, &msg_rx_count, MSG_FSK_WORDS)) {
+		return;				// frame still in progress (or nothing to do)
+	}
+	uint8_t pkt[MSG_PKT_WIRE_LEN];
+	if (msg_fsk_unpack(pkt, msg_rx_words) && msg_packet_parse(pkt, sizeof pkt, &msg_rx)) {
+		msg_rx_valid = true;
+		msg_rx_new = true;
+		// File it in the store: a TEXT frame becomes an inbox entry (which also refreshes HEARD); any other type
+		// (PING/PONG/ACK/WAKE) just updates HEARD so the station shows up on the range screen.
+		if (msg_rx.type == MSG_PKT_TYPE_TEXT) {
+			msg_store_add_inbox(msg_rx.from, (const char *)msg_rx.payload, msg_rx.type, last_rssi);
+		} else {
+			msg_store_heard(msg_rx.from, last_rssi, msg_rx.type);
+		}
+	}
+	msg_rx_count = 0;			// start the next frame fresh
+}
+
+void rt880_msg_set_call(const char *call)
+{
+	unsigned i = 0;
+	for (; call != NULL && call[i] && i < MSG_CALLSIGN_LEN; i++) {
+		msg_call[i] = call[i];
+	}
+	msg_call[i] = 0;
+}
+
+void rt880_msg_rx_arm(void)
+{
+	if (!ready || transmitting) {
+		return;
+	}
+	bk4819_fsk_rx_arm(&receiver);
+	msg_rx_count = 0;
+	msg_rx_armed = true;
+}
+
+// UI edge: true once per newly decoded frame. The actual FIFO work happens in rt880_msg_service() from status().
+bool rt880_msg_poll(void)
+{
+	bool was_new = msg_rx_new;
+	msg_rx_new = false;
+	return was_new;
+}
+
+bool rt880_msg_last(msg_packet_t *out)
+{
+	if (!msg_rx_valid) {
+		return false;
+	}
+	*out = msg_rx;
+	return true;
+}
+
+// Queue a message for transmission. Called from the UI task: it only copies the text and raises the pending flag; the
+// radio task picks it up in rt880_msg_service() and does the actual keying, so the two tasks never touch the BK4819 at
+// once. Returns false only if the modem isn't ready or a send is already queued.
+bool rt880_msg_send(const char *text)
+{
+	if (!ready || msg_tx_pending) {
+		return false;
+	}
+	unsigned i = 0;
+	for (; text != NULL && text[i] != '\0' && i < MSGR_TEXT_LEN; i++) {
+		msg_tx_text[i] = text[i];
+	}
+	msg_tx_text[i] = '\0';
+	__asm volatile("" ::: "memory");	// publish the text before the flag the radio task reads
+	msg_tx_pending = true;
+	return true;
+}
+
+// Board-agnostic hooks the core messenger UI calls (messenger/msg_radio.h).
+void msg_radio_set_call(const char *call) { rt880_msg_set_call(call); }
+void msg_radio_rx_arm(void) { rt880_msg_rx_arm(); }
+bool msg_radio_poll(void) { return rt880_msg_poll(); }
+bool msg_radio_send(const char *text) { return rt880_msg_send(text); }
+#endif
+
 static void status(radio_status_t *value)
 {
 	*value = (radio_status_t){ .rssi_dbm = -127, .noise = 255 };
@@ -306,6 +466,9 @@ static void status(radio_status_t *value)
 	last_rssi = value->rssi_dbm;
 	last_noise = value->noise;
 	voice_level = bk4819_read(&receiver, 0x64);
+#if CONFIG_MESSENGER
+	rt880_msg_service();	// drain the FSK FIFO at the poll rate so the messenger can decode without overrun
+#endif
 }
 const hal_radio_t rt880_radio = {
 	.init = init, .set_mode = mode, .rx = receive, .tx = transmit,

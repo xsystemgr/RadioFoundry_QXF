@@ -49,8 +49,10 @@ static void select_chip(unsigned index, bool high)
 			assert(value == 0);
 		}
 		if (reg == 0x33) {
-			// Band-select GPIO is written on the receiver (bus_b = index 1).
-			assert(index == 1 ? value == 0 || value == 0x10 || value == 0x20 : value == 0);
+			// REG 0x33 on the receiver (bus_b = index 1): RX uses the band-path bits (0x10 / 0x20); TX uses the
+			// front-end filter bit (VHF 0x08 / UHF 0x04) OR'd with the antenna T/R bit 0x10 (so 0x18 / 0x14).
+			// Only bits 2-5 are ever touched; the control chip (index 0) never drives it.
+			assert(index == 1 ? (value & ~0x3Cu) == 0 : value == 0);
 		}
 		if (reg != 0) c->regs[reg] = value;
 		c->writes++; frames++;
@@ -193,10 +195,13 @@ int main(void)
 	assert(rt880_radio.tx(145500000, RADIO_BW_25K, 0, NULL));	// VHF, LO
 	assert(chips[1].regs[0x30] == BK4819_STATE_TX_MAIN);
 	assert((chips[1].regs[0x36] & 0x80u) != 0 && chips[0].regs[0x36] == 0);	// receiver PA on, control off
-	assert(pins[5][0]);						// VHF -> PF0 high
+	assert((chips[1].regs[0x36] >> 8) != 0);			// PA bias (high byte) nonzero - else no RF radiates
+	assert(chips[1].regs[0x33] == (0x08u | 0x10u));			// VHF front-end (bit3) + antenna T/R (bit4)
+	assert(!pins[5][0]);						// VHF -> PF0 low (stock rf_path_set)
 	rt880_radio.tx_off();
 	assert(chips[1].regs[0x30] == BK4819_STATE_RX && !pins[5][0]);	// back to RX, relay low
 	assert(rt880_radio.tx(433500000, RADIO_BW_25K, 1, NULL) && !pins[5][0]);	// UHF, HI -> PF0 low
+	assert(chips[1].regs[0x33] == (0x04u | 0x10u));			// UHF front-end (bit2) + antenna T/R (bit4)
 	rt880_radio.tx_off();
 	assert(!rt880_radio.tx(118000000, RADIO_BW_25K, 0, NULL));	// air band: TX refused (aviation)
 	assert(!rt880_radio.tx(90000000, RADIO_BW_25K, 0, NULL));	// out of band

@@ -240,24 +240,112 @@ static bool hf_live_line(char *buf, uint8_t len)
 	}
 	return true;
 }
+#ifdef RT880_HF_ANTPROBE
+// Antenna / LNA pin finder. The Si4732 answers I2C but is deaf on HF, so the factory likely routes the HF antenna
+// (or powers an HF LNA) through a GPIO we do not drive. This cycles each candidate pin HIGH then LOW for ~2 s and
+// shows it on this line. Tune a known strong MW/SW station, watch the HF RSSI on the line above: when it jumps, the
+// pin shown here is the antenna / LNA switch. Candidates are the pins with no other assignment.
+static const struct { uint32_t port; unsigned pin; const char *name; } ant_cand[] = {
+	{ AT32_GPIO_A, 0, "PA0" }, { AT32_GPIO_A, 1, "PA1" }, { AT32_GPIO_A, 2, "PA2" }, { AT32_GPIO_A, 5, "PA5" },
+	{ AT32_GPIO_A, 6, "PA6" }, { AT32_GPIO_A, 10, "PA10" }, { AT32_GPIO_B, 6, "PB6" }, { AT32_GPIO_B, 8, "PB8" },
+	{ AT32_GPIO_B, 9, "PB9" }, { AT32_GPIO_B, 11, "PB11" }, { AT32_GPIO_C, 3, "PC3" }, { AT32_GPIO_F, 1, "PF1" },
+};
+#define ANT_CAND_N (sizeof ant_cand / sizeof ant_cand[0])
+static uint16_t ant_tick;
+static uint8_t ant_idx;
+static bool ant_level;
+static bool ant_probe_line(char *buf, uint8_t len)
+{
+	if (++ant_tick >= 40u) {		// ~2 s per state at the diag refresh rate
+		ant_tick = 0;
+		at32_pin_input(ant_cand[ant_idx].port, ant_cand[ant_idx].pin);	// release the pin we just drove
+		if (ant_level) {
+			ant_level = false;
+			ant_idx = (uint8_t)((ant_idx + 1u) % ANT_CAND_N);
+		} else {
+			ant_level = true;
+		}
+	}
+	at32_pin_output(ant_cand[ant_idx].port, ant_cand[ant_idx].pin, ant_level);
+	snprintf(buf, len, "ANT %s=%u (%u/%u)", ant_cand[ant_idx].name, (unsigned)ant_level,
+		(unsigned)(ant_idx + 1u), (unsigned)ANT_CAND_N);
+	return true;
+}
+#define HF_DIAG_LINES 3
+#else
 #define HF_DIAG_LINES 2
+#endif
 #else
 #define HF_DIAG_LINES 0
+#endif
+#if CONFIG_MESSENGER
+// GOGUFW analog messenger monitor: arm BK4819 FSK receive once, poll each refresh, and show the last decoded message.
+// Set both radios to the same FM frequency; a message sent from a GOGUFW UV-K1/K5 shows up here. To test the TX path,
+// hold the * and # keys together on this line: the radio sends one canned GGM2 text frame, then returns to listening -
+// a GOGUFW radio (or a second RT-880) on the same frequency decodes it. The chord is used so a plain digit never keys up.
+#define MSG_TX_CHORD	((1u << 3) | (1u << 11))	// * (bit 3) + # (bit 11), both held
+static bool msg_armed_once;
+static bool msg_tx_chord_prev;
+static bool msg_tx_sent;
+static bool msg_diag_line(char *buf, uint8_t len)
+{
+	if (!msg_armed_once) {
+		rt880_msg_rx_arm();
+		msg_armed_once = true;
+	}
+	bool chord = (last_keys & MSG_TX_CHORD) == MSG_TX_CHORD;
+	if (chord && !msg_tx_chord_prev) {
+		msg_tx_sent = rt880_msg_send("RT880 TEST");	// one burst, then rt880_msg_send re-arms RX
+	}
+	msg_tx_chord_prev = chord;
+	if (chord) {
+		snprintf(buf, len, "MSG: TX %s", msg_tx_sent ? "sent" : "fail");
+		return true;
+	}
+	rt880_msg_poll();
+	msg_packet_t m;
+	if (rt880_msg_last(&m)) {
+		snprintf(buf, len, "MSG %s:%.16s", m.from, (const char *)m.payload);
+	} else {
+		snprintf(buf, len, "MSG: listening");
+	}
+	return true;
+}
 #endif
 static bool diag(uint8_t line, char *buf, uint8_t len)
 {
 	switch (line) {
-	case 0: snprintf(buf, len, "RX EXPERIMENT / NO TX"); break;
-	case 1: snprintf(buf, len, "Keys: %04lX", (unsigned long)last_keys); break;
-	case 2: snprintf(buf, len, "No storage writes"); break;
-	case 3: snprintf(buf, len, "CPU %lu MHz", (unsigned long)(AT32_CORE_HZ / 1000000u)); break;
-#if CONFIG_BCAST_FM
-	case 4: snprintf(buf, len, "%s", hf_diag_line()); break;
-	case 5: return hf_live_line(buf, len);
-#endif
-	default: return rt880_rf_diag((uint8_t)(line - 4 - HF_DIAG_LINES), buf, len);
+	case 0: snprintf(buf, len, "RX EXPERIMENT / NO TX"); return true;
+	case 1: snprintf(buf, len, "Keys: %04lX", (unsigned long)last_keys); return true;
+	case 2: snprintf(buf, len, "No storage writes"); return true;
+	case 3: snprintf(buf, len, "CPU %lu MHz", (unsigned long)(AT32_CORE_HZ / 1000000u)); return true;
+	default: break;
 	}
-	return true;
+	uint8_t n = 4;
+#if CONFIG_MESSENGER
+	if (line == n) {
+		return msg_diag_line(buf, len);
+	}
+	n++;
+#endif
+#if CONFIG_BCAST_FM
+	if (line == n) {
+		snprintf(buf, len, "%s", hf_diag_line());
+		return true;
+	}
+	n++;
+	if (line == n) {
+		return hf_live_line(buf, len);
+	}
+	n++;
+#ifdef RT880_HF_ANTPROBE
+	if (line == n) {
+		return ant_probe_line(buf, len);
+	}
+	n++;
+#endif
+#endif
+	return rt880_rf_diag((uint8_t)(line - n), buf, len);
 }
 // Bands. The aeronautical band (108-137 MHz) is RX-only and received in AM:
 // transmitting on aviation frequencies is dangerous and illegal, so its tx flag

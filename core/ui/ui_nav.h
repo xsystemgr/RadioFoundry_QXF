@@ -28,6 +28,11 @@ typedef enum {
 	SCR_ZCHANNEL, SCR_ZPICK, SCR_ZONEEDIT, SCR_ZONEDEL,	// the zone editor (ui.md 2.2): Channel actions, Add
 								// channel, Zone options, Delete zone
 	SCR_DMR_ID,			// the radio's own DMR ID (Settings > My radio)
+#if CONFIG_MESSENGER
+	// Analog messenger (GOGUFW-compatible BK4819 FSK): home menu, a message box (inbox/sent/drafts), one message,
+	// the HEARD list, and the self-contained keypad composer. Only present in a CONFIG_MESSENGER build.
+	SCR_MSGR, SCR_MSGR_LIST, SCR_MSGR_READ, SCR_MSGR_HEARD, SCR_MSGR_COMPOSE,
+#endif
 	SCR_COUNT
 } ui_scr_t;
 
@@ -78,6 +83,12 @@ typedef struct {
 extern const ui_scr_def_t *const ui_scr[SCR_COUNT];
 extern ui_state_t ui_st;
 extern ui_target_t ui_target;		// the target of SCR_ACTIONS / SCR_COMPOSE
+
+#if CONFIG_MESSENGER
+// The analog messenger screens (core/ui/ui_msgr.c), plugged into ui_scr[] by ui_menus.c. Self-contained (its own
+// keypad composer) so it needs none of the channel-editor machinery, which a lean messenger build leaves out.
+extern const ui_scr_def_t msgr_home_screen, msgr_list_screen, msgr_read_screen, msgr_heard_screen, msgr_compose_screen;
+#endif
 
 const radio_view_t *ui_view(void);
 ui_frame_t *ui_frame(void);
