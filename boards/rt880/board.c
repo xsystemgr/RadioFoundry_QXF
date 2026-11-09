@@ -141,11 +141,13 @@ static const hal_display_t display = {
 
 static const uint8_t rows[] = { 10, 2, 1, 0 };
 static uint32_t last_keys;
+#define PTT_BIT	16u	// virtual scan bit for the PTT (outside the 4x4 matrix, bits 0-15)
 static void input_init(void)
 {
 	for (unsigned i = 0; i < 4; i++) at32_pin_output(AT32_GPIO_B, rows[i], false);
 	for (unsigned i = 10; i <= 12; i++) at32_pin_input(AT32_GPIO_C, i);
 	at32_pin_input(AT32_GPIO_D, 2);
+	at32_pin_input(AT32_GPIO_B, 6);		// PTT, active low (not part of the keypad matrix)
 }
 static uint32_t input_scan(void)
 {
@@ -160,6 +162,8 @@ static uint32_t input_scan(void)
 		}
 		at32_pin_write(AT32_GPIO_B, rows[row], false);
 	}
+	if (!at32_pin_read(AT32_GPIO_B, 6))	// PTT pressed = PB6 low
+		result |= 1u << PTT_BIT;
 	last_keys = result;
 	return result;
 }
@@ -184,6 +188,7 @@ static const keymap_entry_t keys[] = {
 	{ .bit = 13, .short_action = ACT_NAV_UP, .long_action = ACT_NAV_UP, .repeat = true },
 	{ .bit = 14, .short_action = ACT_NAV_DOWN, .long_action = ACT_NAV_DOWN, .repeat = true },
 	{ .bit = 15, .short_action = ACT_BACK, .long_action = ACT_BACK },
+	{ .bit = PTT_BIT, .short_action = ACT_PTT, .long_action = ACT_PTT, .raw_edges = true },	// PB6: FM voice PTT
 };
 
 static bool flash_init(void) { return false; }

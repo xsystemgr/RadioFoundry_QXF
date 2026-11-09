@@ -24,6 +24,10 @@
 #if CONFIG_HOTSPOT || (CONFIG_USB_NETWORK && CONFIG_HOSTLINK)
 #include "hostlink/hostlink.h"
 #endif
+#if CONFIG_MESSENGER
+#include "messenger/msg_store.h"
+#include "messenger/msg_radio.h"
+#endif
 #if CONFIG_HOTSPOT
 #include "hotspot/hotspot.h"
 #endif
@@ -651,7 +655,11 @@ static void banner_open(void)
 	uint16_t msg = b->msg;
 	b->kind = UI_BANNER_NONE;
 	if (kind == UI_BANNER_MESSAGE)
+#if CONFIG_MESSENGER
+		{ (void)msg; ui_msgr_open_inbox(); }
+#else
 		ui_push(SCR_MESSAGE, msg);
+#endif
 #if CONFIG_ZONE_SHARE
 	else if (kind == UI_BANNER_ZONE_OFFER)
 		ui_push(SCR_OFFER, 0);
@@ -1986,6 +1994,28 @@ static uint8_t usb_net_state(void)
 }
 #endif
 
+#if CONFIG_MESSENGER
+// Poll the analog messenger for a freshly decoded frame and pop up a banner (plus the message beep) for the newest
+// inbox entry, so a message surfaces wherever the user is. CONTEXT on the banner opens the inbox (banner_open).
+static void msgr_notify_tick(void)
+{
+	if (!msg_radio_poll())
+		return;
+	const msg_entry_t *e = msg_store_get(MSG_BOX_INBOX, 0);
+	if (e == NULL)
+		return;
+	char title[UI_BANNER_TEXT];
+	sbuf_t sb;
+	sb_init(&sb, title, sizeof title);
+	sb_str(&sb, "Message from ");
+	sb_str(&sb, e->from[0] ? e->from : "?");
+	banner(UI_BANNER_MESSAGE, false, 0, title, e->text);
+	ui_st.banner.msg = 0;			// the newest inbox entry
+	if (ui_st.message_tone)
+		ui_svc_beep(UI_BEEP_MESSAGE);
+}
+#endif
+
 bool ui_app_tick(const radio_view_t *v, uint32_t now_ms)
 {
 	static uint32_t serial_seen;
@@ -1999,6 +2029,9 @@ bool ui_app_tick(const radio_view_t *v, uint32_t now_ms)
 	ui_st.now_ms = now_ms;
 	ui_svc_poll();
 	ui_svc_keys_poll();
+#if CONFIG_MESSENGER
+	msgr_notify_tick();	// pop up a banner when a new analog message is decoded
+#endif
 #if CONFIG_ZONE_EDIT
 	ui_svc_zone_poll();
 #endif

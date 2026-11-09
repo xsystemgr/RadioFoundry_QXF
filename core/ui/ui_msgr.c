@@ -275,6 +275,13 @@ const ui_scr_def_t msgr_home_screen = {
 	.count = msgr_home_count, .item = msgr_home_item, .select = msgr_home_select, .enter = msgr_home_enter,
 };
 
+// Open the inbox directly (used by the incoming-message banner's CONTEXT action).
+void ui_msgr_open_inbox(void)
+{
+	msgr_box = MSG_BOX_INBOX;
+	ui_push(SCR_MSGR_LIST, 0);
+}
+
 // ---- message box list (SCR_MSGR_LIST) -----------------------------------------------------------
 static uint16_t msgr_list_count(void) { return msg_store_count(msgr_box); }
 
@@ -289,6 +296,8 @@ static void msgr_list_item(uint16_t i, ui_item_t *it)
 		sb_str(&b, e->from[0] ? e->from : "?");
 		if (!e->read)
 			it->flags |= UI_ITEM_WARN;		// unread stands out
+	} else if (msgr_box == MSG_BOX_SENT) {
+		sb_str(&b, e->acked ? "ALL ACK" : "ALL");	// ACK = the message was delivered
 	} else {
 		sb_str(&b, "ALL");
 	}
@@ -374,6 +383,8 @@ static const char *msgr_read_body(void)
 		sb_str(&b, " [");
 		sb_str(&b, type_short(e->type));
 		sb_chr(&b, ']');
+	} else if (msgr_box == MSG_BOX_SENT) {
+		sb_str(&b, e->acked ? "To ALL - delivered (ACK)" : "To ALL - no ACK yet");
 	} else {
 		sb_str(&b, "To ALL");
 	}

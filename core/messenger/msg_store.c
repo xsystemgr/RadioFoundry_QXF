@@ -86,14 +86,27 @@ void msg_store_add_inbox(const char *from, const char *text, uint8_t type, int8_
 	msg_store_heard(from, rssi, type);
 }
 
-void msg_store_add_sent(const char *text)
+void msg_store_add_sent(const char *text, uint16_t id)
 {
 	msg_entry_t *e = box_push_front(MSG_BOX_SENT);
 	if (e == NULL) return;
 	e->type = MSG_PKT_TYPE_TEXT;
 	e->read = true;
 	e->from[0] = '\0';
+	e->id = id;
+	e->acked = false;
 	copy_field(e->text, text, MSGR_TEXT_LEN);
+}
+
+bool msg_store_ack(uint16_t id)
+{
+	for (uint8_t i = 0; i < MSGR_SENT_MAX; i++) {
+		if (sent[i].used && sent[i].id == id) {
+			sent[i].acked = true;
+			return true;
+		}
+	}
+	return false;
 }
 
 uint8_t msg_store_add_draft(const char *text)

@@ -59,6 +59,8 @@ void at32_pin_write(uint32_t port, unsigned pin, bool level)
 }
 bool at32_pin_read(uint32_t port, unsigned pin)
 {
+	if (port == AT32_GPIO_B && pin == 6)
+		return true;	// PTT (PB6) is active low: high = released, so the matrix scan reads no PTT bit
 	unsigned col = port == AT32_GPIO_D ? 3 : pin - 10;
 	return pressed < 16 && active_row < 4 && pressed == active_row * 4 + col;
 }
@@ -121,14 +123,18 @@ int main(void)
 	assert(writes == 0);
 	// The air band (first entry) is RX-only; the VHF and UHF ranges allow TX.
 	assert(!board.bands[0].tx && board.bands[1].tx && board.bands[2].tx);
-	unsigned digits = 0;
+	unsigned digits = 0, ptt = 0;
 	for (unsigned i = 0; i < board.keymap_len; i++) {
-		assert(board.keymap[i].short_action != ACT_PTT);
-		assert(board.keymap[i].long_action != ACT_PTT);
+		if (board.keymap[i].short_action == ACT_PTT) {
+			// The PTT (PB6) reports raw DOWN/UP edges on its own scan bit, outside the 4x4 matrix.
+			assert(board.keymap[i].raw_edges && board.keymap[i].bit >= 16);
+			ptt++;
+		}
 		unsigned action = board.keymap[i].short_action;
 		if (action >= ACT_DIGIT_0 && action <= ACT_DIGIT_9) digits |= 1u << (action - ACT_DIGIT_0);
 	}
 	assert(digits == 0x3FFu);
+	assert(ptt == 1);		// exactly one PTT binding
 	assert(board.keymap[11].short_action == ACT_VFO_TOGGLE);
 	assert(!board.flash->init());
 	assert(!board.flash->write(0, "x", 1));

@@ -88,6 +88,7 @@ extern ui_target_t ui_target;		// the target of SCR_ACTIONS / SCR_COMPOSE
 // The analog messenger screens (core/ui/ui_msgr.c), plugged into ui_scr[] by ui_menus.c. Self-contained (its own
 // keypad composer) so it needs none of the channel-editor machinery, which a lean messenger build leaves out.
 extern const ui_scr_def_t msgr_home_screen, msgr_list_screen, msgr_read_screen, msgr_heard_screen, msgr_compose_screen;
+void ui_msgr_open_inbox(void);		// open the inbox (used by the incoming-message banner)
 #endif
 
 const radio_view_t *ui_view(void);

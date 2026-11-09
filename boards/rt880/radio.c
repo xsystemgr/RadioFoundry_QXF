@@ -243,6 +243,19 @@ static bool do_tune(uint32_t hz, radio_bw_t bw, bool am)
 	frequency = hz;
 	tuned = true;
 	hal_delay_ms(10); // conservative acquisition, not an ultra-scan profile
+#if CONFIG_MESSENGER
+	// Keep the analog messenger listening on the current FM channel so a message pops up anywhere (GOGUFW "full watch").
+	// Re-arm only when the frequency actually changes, so a frame in progress is never reset by a routine re-tune.
+	static uint32_t msg_armed_hz;
+	if (!am && !hf_bk_mode) {
+		if (frequency != msg_armed_hz) {
+			rt880_msg_rx_arm();
+			msg_armed_hz = frequency;
+		}
+	} else {
+		msg_armed_hz = 0;	// left FM (AM / HF experiment): the next FM tune re-arms
+	}
+#endif
 	return true;
 }
 static bool receive(uint32_t hz, radio_bw_t bw, const subtone_t *tone)
@@ -297,9 +310,13 @@ static bool transmit(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t 
 	at32_pin_write(AT32_GPIO_B, 11, false);
 	at32_pin_write(AT32_GPIO_F, 0, false);
 	bk4819_write(&receiver, 0x33, (uint16_t)((uhf ? 0x04u : 0x08u) | 0x10u));
+	// Silence the tone generators so the microphone modulates the carrier. The analog messenger leaves Tone2 enabled
+	// (REG 0x70 = 0x00E0) for its FSK, and it is kept armed on every FM channel - without clearing it here a voice TX
+	// would modulate with Tone2 (nothing) instead of the mic. The messenger's own FSK TX re-enables Tone2 afterwards.
+	bk4819_write(&receiver, 0x70, 0x0000);
 	bk4819_tx_prepare(&receiver, tt, tv);		// deviation and sub-audio
 	bk4819_write(&receiver, BK4819_REG_PA, tx_pa_word(power));
-	bk4819_tx_tune(&receiver, hz);			// freq, POWER_ON, STATE_TX_MAIN
+	bk4819_tx_tune(&receiver, hz);			// freq, POWER_ON, STATE_TX_MAIN (mic path on)
 	frequency = hz;
 	tx_bw = bw;
 	transmitting = true;
@@ -314,6 +331,12 @@ static void tx_off(void)
 	transmitting = false;
 	do_tune(frequency, tx_bw, am_mode);		// re-establish RX on the same frequency
 	audio_apply();
+#if CONFIG_MESSENGER
+	// A voice/FSK transmit leaves the chip in plain FM RX; re-arm the analog messenger so it keeps listening (do_tune
+	// above does not, since the frequency is unchanged). Only on a normal FM channel, not the AM / HF experiment.
+	if (!am_mode && !hf_bk_mode)
+		rt880_msg_rx_arm();
+#endif
 }
 #if CONFIG_MESSENGER
 // GOGUFW-compatible analog messenger on the channel receiver (the BK4819 does the 1.2k FSK in hardware). RX arms the
@@ -332,33 +355,59 @@ static uint16_t msg_tx_id = 1;
 // buffer.
 static volatile bool msg_tx_pending;
 static char msg_tx_text[MSGR_TEXT_LEN + 1];
+// Auto-ACK queue: when a TEXT frame is received the radio task queues an ACK back to the sender, keyed on the next
+// service pass (so RX decode and TX never overlap). The sender then marks that message delivered.
+static volatile bool msg_ack_pending;
+static char msg_ack_to[MSG_CALLSIGN_LEN + 1];
+static uint16_t msg_ack_id;
 
-// Perform one queued transmit, in the radio-task context. Keys TX on the current frequency, sends the GGM2 frame, and
-// returns to RX. A sent frame is copied to the Sent box; one that could not be keyed (out of a TX band) goes to Drafts.
+// Key one GGM2 frame already packed into w[], returning to RX afterwards. Returns whether the burst completed.
+static bool msg_tx_frame(const uint16_t *w)
+{
+	bool was_armed = msg_rx_armed;
+	bool ok = false;
+	msg_rx_armed = false;
+	if (transmit(frequency, tx_bw, 1, NULL)) {	// key TX (refused out of a TX band)
+		bk4819_fsk_setup(&receiver);
+		ok = bk4819_fsk_tx(&receiver, w, MSG_FSK_WORDS);
+		tx_off();
+	}
+	if (was_armed) {
+		rt880_msg_rx_arm();			// back to listening
+	}
+	return ok;
+}
+
+// Perform one queued text transmit, in the radio-task context. A sent frame is copied to the Sent box (with its id so a
+// later ACK can mark it delivered); one that could not be keyed (out of a TX band) goes to Drafts.
 static void msg_tx_run(void)
 {
 	uint8_t pkt[MSG_PKT_WIRE_LEN];
+	uint16_t id = msg_tx_id++;
 	bool ok = false;
-	if (msg_packet_build_text(pkt, sizeof pkt, msg_tx_id++, msg_call, msg_tx_text, 3) == MSG_PKT_WIRE_LEN) {
+	if (msg_packet_build_text(pkt, sizeof pkt, id, msg_call, msg_tx_text, 3) == MSG_PKT_WIRE_LEN) {
 		uint16_t w[MSG_FSK_WORDS];
 		msg_fsk_pack(w, pkt);
-		bool was_armed = msg_rx_armed;
-		msg_rx_armed = false;
-		if (transmit(frequency, tx_bw, 1, NULL)) {	// key TX (refused out of a TX band)
-			bk4819_fsk_setup(&receiver);
-			ok = bk4819_fsk_tx(&receiver, w, MSG_FSK_WORDS);
-			tx_off();
-		}
-		if (was_armed) {
-			rt880_msg_rx_arm();			// back to listening
-		}
+		ok = msg_tx_frame(w);
 	}
 	if (ok) {
-		msg_store_add_sent(msg_tx_text);
+		msg_store_add_sent(msg_tx_text, id);
 	} else {
 		msg_store_add_draft(msg_tx_text);	// couldn't key here - keep it so the user can retry elsewhere
 	}
 	msg_tx_pending = false;
+}
+
+// Send the queued auto-ACK for a received message, back to its sender with the same id.
+static void msg_ack_run(void)
+{
+	uint8_t pkt[MSG_PKT_WIRE_LEN];
+	if (msg_packet_build_ack(pkt, sizeof pkt, msg_ack_id, msg_call, msg_ack_to) == MSG_PKT_WIRE_LEN) {
+		uint16_t w[MSG_FSK_WORDS];
+		msg_fsk_pack(w, pkt);
+		(void)msg_tx_frame(w);
+	}
+	msg_ack_pending = false;
 }
 
 // Drain the FSK FIFO incrementally - called from status() every radio poll (25 ms), fast enough that the 8-byte FIFO
@@ -373,6 +422,10 @@ void rt880_msg_service(void)
 		msg_tx_run();
 		return;
 	}
+	if (msg_ack_pending) {
+		msg_ack_run();
+		return;
+	}
 	if (transmitting || !msg_rx_armed) {
 		return;
 	}
@@ -382,16 +435,30 @@ void rt880_msg_service(void)
 	uint8_t pkt[MSG_PKT_WIRE_LEN];
 	if (msg_fsk_unpack(pkt, msg_rx_words) && msg_packet_parse(pkt, sizeof pkt, &msg_rx)) {
 		msg_rx_valid = true;
-		msg_rx_new = true;
-		// File it in the store: a TEXT frame becomes an inbox entry (which also refreshes HEARD); any other type
-		// (PING/PONG/ACK/WAKE) just updates HEARD so the station shows up on the range screen.
 		if (msg_rx.type == MSG_PKT_TYPE_TEXT) {
+			// A text message: file it in the inbox (which also refreshes HEARD), flag the UI to pop it up, and
+			// queue an ACK back to the sender so they see it was delivered.
 			msg_store_add_inbox(msg_rx.from, (const char *)msg_rx.payload, msg_rx.type, last_rssi);
+			msg_rx_new = true;
+			unsigned i = 0;
+			for (; msg_rx.from[i] && i < MSG_CALLSIGN_LEN; i++) {
+				msg_ack_to[i] = msg_rx.from[i];
+			}
+			msg_ack_to[i] = '\0';
+			msg_ack_id = msg_rx.id;
+			msg_ack_pending = true;
+		} else if (msg_rx.type == MSG_PKT_TYPE_ACK) {
+			// An ACK for one of our messages: mark it delivered. Still refresh HEARD for the station.
+			msg_store_ack(msg_rx.id);
+			msg_store_heard(msg_rx.from, last_rssi, msg_rx.type);
 		} else {
 			msg_store_heard(msg_rx.from, last_rssi, msg_rx.type);
 		}
 	}
-	msg_rx_count = 0;			// start the next frame fresh
+	// Re-arm for the next frame: the BK4819 FSK receiver stops after RX_FINISHED, so without this only the first
+	// message after each arm was ever decoded and the rest were lost. (A pending ACK/TX re-arms again on its own.)
+	msg_rx_count = 0;
+	bk4819_fsk_rx_arm(&receiver);
 }
 
 void rt880_msg_set_call(const char *call)

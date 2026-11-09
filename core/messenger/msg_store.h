@@ -26,6 +26,8 @@ typedef struct {
 	char	from[MSGR_CALL_LEN + 1];	// sender callsign (inbox); own call for sent; empty for drafts
 	char	text[MSGR_TEXT_LEN + 1];
 	bool	read;			// inbox only: has the user opened it
+	uint16_t id;			// GGM2 message id (sent entries: to match an incoming ACK)
+	bool	acked;			// sent only: an ACK for this id has come back (delivered)
 } msg_entry_t;
 
 typedef struct {
@@ -39,8 +41,9 @@ void msg_store_reset(void);
 
 // Insert newest-first; the oldest entry is dropped when the box is full.
 void msg_store_add_inbox(const char *from, const char *text, uint8_t type, int8_t rssi);
-void msg_store_add_sent(const char *text);
+void msg_store_add_sent(const char *text, uint16_t id);	// id lets a later ACK mark it delivered
 uint8_t msg_store_add_draft(const char *text);		// returns the new draft's index (0 = newest)
+bool msg_store_ack(uint16_t id);			// mark the Sent entry with this id delivered; true if found
 void msg_store_set_draft(uint8_t index, const char *text);
 
 uint8_t msg_store_count(msg_box_t box);
