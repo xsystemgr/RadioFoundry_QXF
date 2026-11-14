@@ -9,6 +9,13 @@
 #include "ui_svc.h"
 #include "config.h"
 
+#ifndef RFOUNDRY_GIT
+#define RFOUNDRY_GIT "host"
+#endif
+#ifndef RFOUNDRY_RELEASE
+#define RFOUNDRY_RELEASE ""
+#endif
+
 ui_layout_t ui_layout;
 static const font_t *font_largest;	// the large text setting's font (large_font)
 
@@ -1641,7 +1648,7 @@ void ui_draw_home(const radio_view_t *v, const ui_state_t *s)
 	}
 #endif
 	gfx_clear(ui_col.bg);
-	ui_draw_top(v, s, NULL, NULL);
+	ui_draw_top(v, s, NULL, NULL);			// version shown only on the boot splash, not the Home strip
 	if (s->large_text) {
 		draw_home_large(v, s);
 	} else {
@@ -2093,7 +2100,7 @@ void ui_draw_home_dual(const radio_view_t *v, const ui_state_t *s)
 	const ui_layout_t *L = &ui_layout;
 	int w = gfx_width();
 	gfx_clear(ui_col.bg);
-	ui_draw_top(v, s, NULL, NULL);
+	ui_draw_top(v, s, NULL, NULL);			// version shown only on the boot splash, not the Home strip
 	if (s->large_text) {
 		dual_large(v, s);
 	} else {

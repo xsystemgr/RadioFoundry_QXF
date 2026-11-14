@@ -20,6 +20,15 @@
 static bk4819_t receiver, control;
 static uint16_t receiver_id, control_id;
 static bool ready, tuned, fm = true, started, am_mode, transmitting;
+// Chip routing for TX. The factory (V1.16) splits the two BK4819: bus_a (write fn 0x801e6d4, PC7/PC8/PC6) is the
+// TRANSMIT chip - it carries the microphone ADC, the deviation (REG 0x40), the PA (REG 0x36) and the T/R switch -
+// while bus_b (write fn 0x801e660, PA8/PF6/PC9) is the RECEIVE chip whose AF feeds the speaker amplifier. Voice must
+// therefore be modulated on bus_a (= `control`), where the mic is physically wired; keying a carrier on bus_b gives
+// RF but no audio, which is exactly why the earlier all-on-bus_b build transmitted FSK and a bare carrier yet never
+// passed the microphone. The custom analog messenger FSK is DSP-generated (no mic) and already works on bus_b, so it
+// stays there; only mic-modulated voice moves to bus_a.
+static bool tx_on_receiver;	// this TX uses bus_b (messenger FSK); default (false) = bus_a voice, the factory TX chip
+static bk4819_t *tx_active;	// the chip currently keyed, so tx_off() ends the right one
 static radio_bw_t tx_bw = RADIO_BW_25K;
 static uint32_t frequency;
 static bool drive_a, drive_b, audio_requested, audio_open;
@@ -30,6 +39,9 @@ static uint16_t af_readback, gain_readback;
 static int16_t last_rssi = -127;
 static uint8_t last_noise = 255;
 static uint16_t enables_readback, power_readback, voice_level;
+static uint16_t voice_level_a, voice_level_b;	// REG 0x64 (mic/voice amplitude) on bus_a / bus_b, for the mic probe
+static uint16_t tx_mic_peak;			// peak REG 0x64 on the TX chip seen during the current/last voice TX
+static uint16_t tx_r30, tx_r40, tx_r50, tx_r70;	// live readback of the TX chip's key modulation registers during voice TX
 
 static void cs_a(bool high) { at32_pin_write(AT32_GPIO_C, 7, high); }
 static void clk_a(bool high) { at32_pin_write(AT32_GPIO_C, 8, high); }
@@ -59,6 +71,98 @@ static const bk4819_bus_t bus_b = {
 	.delay_us = hal_delay_us, .delay_ms = hal_delay_ms,
 	.crit_enter = at32_irq_save, .crit_exit = at32_irq_restore,
 };
+
+// External audio codec on its own bit-banged bus: PA1 = clock, PA0 = data-out, PA2 = data-in, PF1 = chip select.
+// The factory configures the microphone / TX-audio routing through THIS chip, not the BK4819 - which is why no BK4819
+// register ever made voice modulate (RX speaker audio works without the codec, so it is the mic path, not the output).
+// This is a faithful copy of the factory power-on sequence (reverse-engineered from the register/GPIO traffic only).
+static void codec_clk(bool h) { at32_pin_write(AT32_GPIO_A, 1, h); }
+static void codec_dat(bool h) { at32_pin_write(AT32_GPIO_A, 0, h); }
+static void codec_cs(bool h)  { at32_pin_write(AT32_GPIO_F, 1, h); }
+static void codec_byte(uint8_t b)
+{
+	for (int i = 7; i >= 0; i--) {		// MSB first, data sampled on the rising clock edge (as the stock bit-bang does)
+		codec_clk(false);
+		codec_dat((b >> i) & 1u);
+		hal_delay_us(2);
+		codec_clk(true);
+		hal_delay_us(2);
+	}
+}
+static void codec_cmd(const uint8_t *d, unsigned n)
+{
+	codec_cs(false);			// CS low (assert)
+	hal_delay_us(5);
+	for (unsigned i = 0; i < n; i++) codec_byte(d[i]);
+	hal_delay_us(5);
+	codec_cs(true);				// CS high (deassert)
+}
+static void codec_init(void)
+{
+	at32_pin_output(AT32_GPIO_A, 1, false);		// clock idle low
+	at32_pin_output(AT32_GPIO_A, 0, false);		// data
+	at32_pin_input_floating(AT32_GPIO_A, 2);	// data-in (read-back, unused here)
+	at32_pin_output(AT32_GPIO_F, 1, true);		// CS idle high
+	hal_delay_ms(100);
+	{ static const uint8_t c[] = { 0x01 };             codec_cmd(c, sizeof c); }
+	hal_delay_ms(50);
+	{ static const uint8_t c[] = { 0xE0, 0x11, 0x80 }; codec_cmd(c, sizeof c); }
+	hal_delay_ms(25);
+	{ static const uint8_t c[] = { 0xE0, 0x11, 0x40 }; codec_cmd(c, sizeof c); }
+	hal_delay_ms(5);
+	{ static const uint8_t c[] = { 0xE1, 0x02, 0x1C }; codec_cmd(c, sizeof c); }
+	hal_delay_ms(10);
+	{ static const uint8_t c[] = { 0xE2, 0xE2, 0x3E }; codec_cmd(c, sizeof c); }
+	hal_delay_ms(100);
+}
+
+// The microphone does NOT reach the BK4819 through its internal mic ADC. The schematic (RT880 V2) shows MIC1 going
+// through an analog mux (U501) and the ANC mic amp to the MOD481B pin - the external modulation input of chip B
+// (= bus_b). In RX the mux routes MIC1 to chip A for monitoring (which is why the probe saw the mic on bus_a); only
+// in TX must it be switched so MIC1 reaches the transmitting chip B. Two MCU lines control it: RXTS-SW = PA7 (U502
+// pin 23) and ANC-POWER-EN = PC3 (U502 pin 11, and the one the factory firmware drives). Never touching these is the
+// real reason voice never modulated - the transmitting chip's mic input was never connected.
+// Microphone routing (confirmed from the schematic + the no-RF mic-sense test): the internal mic (IMIC, selected by
+// the PB8 pull-up - never driven) reaches MICI, and the analog mux U501 sends MICI -> MOD4819A -> chip A's MICP pin
+// (= our bus_b) when SW2 (ANC-POWER-EN = PC3) is LOW. SW1 (RXTS-SW = PA7) low keeps AF-out on the speaker path. So
+// both lines idle LOW and the microphone is already routed to the transmit chip (bus_b); no toggling is needed, the
+// lines are just held low. The mic-sense build confirmed bus_b's REG 0x64 tracks speech in this state.
+static void mic_path_init(void)
+{
+	// Proven-good routing from the no-RF mic-sense build: PC3 (ANC-POWER-EN) low routes MIC1 to bus_b, where REG 0x64
+	// tracked speech. PA7 low keeps AF-out on the speaker path; PB8 left to its hardware pull-up (internal mic).
+	at32_pin_output(AT32_GPIO_A, 7, false);
+	at32_pin_output(AT32_GPIO_C, 3, false);
+	at32_pin_input_floating(AT32_GPIO_B, 8);
+}
+static void mic_path_tx(bool on)
+{
+	(void)on;
+	at32_pin_write(AT32_GPIO_A, 7, false);
+	at32_pin_write(AT32_GPIO_C, 3, false);
+}
+
+// The complete AF / audio-DSP register state captured from the working nicFW880 firmware (reference_audio_path capture).
+// Our shared init_main + analog_mode leave a different audio base (notably 0x47 muted and 0x24/0x3D/0x4A/0x54/0x55/0x75
+// unset), which left BOTH the RX speaker and the TX mic silent. Programming the exact nicFW base makes the DSP the mic
+// flows through correct. Applied at init (so RX uses it) and re-applied after a transmit (so RX is restored). Registers
+// that the per-tune / per-bandwidth path owns (0x37, 0x43) are deliberately NOT set here to avoid fighting it.
+static void nicfw_af_base(bk4819_t *dev)
+{
+	bk4819_write(dev, 0x24, 0x8C7E);
+	bk4819_write(dev, 0x28, 0x2B38);
+	bk4819_write(dev, 0x29, 0x2B24);
+	bk4819_write(dev, 0x2B, 0x0000);
+	bk4819_write(dev, 0x3D, 0x2AAB);
+	bk4819_write(dev, 0x3F, 0x0800);
+	bk4819_write(dev, 0x47, 0x6140);	// AF-select = FM (un-muted) - the reference's RX value, not analog_mode's MUTE
+	bk4819_write(dev, 0x4A, 0x5450);	// 0x48 (AF DAC gain) is owned by volume() - do not pin it here
+	bk4819_write(dev, 0x51, 0x9100);
+	bk4819_write(dev, 0x54, 0x9009);
+	bk4819_write(dev, 0x55, 0x31A9);
+	bk4819_write(dev, 0x73, 0x3800);
+	bk4819_write(dev, 0x75, 0xE102);
+}
 
 // Bounded raw frames for fault/reset shutdown: no DWT delays, RTOS or locks.
 static void halt_frame(const bk4819_bus_t *bus, uint8_t reg)
@@ -182,15 +286,54 @@ static void init(void)
 	// A missing or different chip is not permission to run an initialization table.
 	if (receiver_id != BK4819_ID || control_id != BK4819_ID) return;
 	started = true;
+	codec_init();	// configure the external audio codec (the microphone / TX-audio routing the factory sets up here)
+	mic_path_init();	// RXTS-SW (PA7) and ANC-POWER-EN (PC3) as outputs, idle in the RX routing
+	// bus_a is the factory's transmit chip, so it carries the microphone. Give it the same static setup as the
+	// receiver (REG 0x7D mic-gain = 0xE34A, REG 0x37 regulators, REG 0x47 AF, bandwidth) WITHOUT asserting its RF
+	// front-end GPIOs (REG 0x33) at startup - exactly what init_rx_only does. The earlier build left this chip at bare
+	// POWER_ON with none of the audio registers, so even keying it could not have modulated. The TX-DSP / mic-ADC
+	// enables and the T/R path are raised only at key time in transmit(); here it is parked idle with its PA off.
+	// bus_a is the transmit + microphone chip, so it gets the FULL main init - exactly as the working BK4819 board
+	// db25d does for its transmit chip (bk4819_init_main + bk4819_analog_mode). init_main runs the REG 0x30 = 0x0302
+	// step that enables the TX DSP, which is the block that mixes the live mic ADC into the modulator. The earlier
+	// init_rx_only SKIPS that step (it drops any REG 0x30 value with the TX-DSP bits), so the mic ADC stayed alive
+	// (VOX/REG 0x64 responded) but never reached the modulator - a 1 kHz tone from the generator transmitted fine
+	// while the microphone was silent. analog_mode then selects the live-mic TX audio source (REG 0x50 = 0x3B18).
+	bk4819_init_main(&control);
+	bk4819_analog_mode(&control);
 	bk4819_write(&control, BK4819_REG_PA, 0);
-	bk4819_write(&control, BK4819_REG_ENABLES, 0);
-	bk4819_write(&control, 0x33, 0);
-	bk4819_write(&control, BK4819_REG_POWER, BK4819_POWER_ON);
-	bk4819_init_rx_only(&receiver);
+	bk4819_set_state(&control, BK4819_STATE_IDLE);
+	// bus_b is BOTH the receiver AND, per the schematic, the voice TRANSMIT chip (schematic chip A: MICI -> MOD4819A ->
+	// its MICP pin when PC3/SW2 is low). So it must get the FULL main init too - init_main runs the REG 0x30 = 0x0302
+	// TX-DSP step that init_rx_only skips; without it the externally-routed microphone reaches the chip's MICP pin but
+	// the TX DSP that modulates it was never enabled, so voice stayed silent even with the mux routed correctly.
+	bk4819_init_main(&receiver);
 	bk4819_analog_mode(&receiver);
+	nicfw_af_base(&receiver);		// the working nicFW audio-DSP base, so RX and TX share the correct AF path
+	bk4819_write(&receiver, 0x7D, 0xE952);	// mic sensitivity (nicFW)
 	bk4819_write(&receiver, BK4819_REG_PA, 0);
 	ready = true;
 	volume(volume_percent);
+#ifdef RT880_MIC_PROBE
+	// Mic probe (bench diagnostic, NO RF): run the microphone ADC + TX-DSP on BOTH chips with the PA off, the T/R bit
+	// clear and the antenna not routed, so REG 0x64 (voice amplitude) tracks the mic input without anything radiating.
+	// Open Diagnostics, speak into the mic, and watch "mA:xxxx mB:xxxx" (line 8): the number that jumps is the chip the
+	// microphone is wired to. If NEITHER moves, the mic is not on a BK4819 MIC pin at all (e.g. the MCU ADC path).
+	{
+		const uint32_t hz = 145500000u;
+		bk4819_t *probe[] = { &control, &receiver };
+		for (unsigned i = 0; i < 2; i++) {
+			bk4819_write(probe[i], 0x33, 0);		// no T/R, no antenna - nothing can radiate
+			bk4819_write(probe[i], BK4819_REG_PA, 0);	// PA off
+			bk4819_set_freq(probe[i], hz);			// an LO so the TX DSP / mic ADC run
+			bk4819_write(probe[i], 0x40, 0x352A);		// plain deviation
+			bk4819_write(probe[i], 0x70, 0x0000);		// no tone generator
+			bk4819_set_state(probe[i], BK4819_STATE_TX);	// mic ADC + TX DSP on (carrier-only stage, PA still 0)
+		}
+		tuned = true;	// so status() keeps sampling REG 0x64 on both chips
+		audio(true);	// open the speaker in case the mic self-monitors
+	}
+#endif
 #ifdef RT880_PIN_FINDER
 	// Pin finder: hold every unassigned, non-keypad pin as input with pull-up so it
 	// idles high (1). Press PTT / any button and watch the Diagnostics port lines for
@@ -274,13 +417,16 @@ static bool rx_am(uint32_t hz, radio_bw_t bw)
 // and takes the bias from per-band calibration. An earlier version wrote only the low byte, leaving the bias at 0, so
 // the PA was "on" but radiated nothing (confirmed on hardware: TX stored to Sent yet no carrier). These are deliberately
 // conservative lab bias levels, well under full scale (0xFF high byte). Transmit into a proper antenna or dummy load.
+// The PA bias (REG 0x36 high byte). The stock forms it as (powerval & 0x3F) << 2, with powerval ~0x29-0x37 at full
+// power (~4-5 W). For the low-power RF-desense test this is set well below that and trimmed to the measured output via
+// the build define RT880_PA_BIAS (e.g. make ... RT880_PA_BIAS=0x30), so an exact 500 mW can be dialled in once measured.
+#ifndef RT880_PA_BIAS
+#define RT880_PA_BIAS 0x30u
+#endif
 static uint16_t tx_pa_word(uint8_t power)
 {
-	// First-light bias levels, kept deliberately LOW while the RF antenna path is validated on hardware - just enough
-	// to confirm a carrier, far below the stock per-band calibration. Raise only once the path is proven and into a
-	// proper antenna / dummy load.
-	uint16_t bias = power >= 1 ? 0x18u : 0x10u;	// HI / LO (minimal)
-	return (uint16_t)((bias << 8) | 0xFFu);		// bias in the high byte, enable + full gain select in the low
+	(void)power;					// single low-power level for the bench test
+	return (uint16_t)(((uint16_t)(RT880_PA_BIAS) << 8) | 0xFFu);	// bias in the high byte, enable + gain in the low
 }
 static bool transmit(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
 {
@@ -296,27 +442,70 @@ static bool transmit(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t 
 		   : tone->type == TONE_DCS_INV ? BK4819_TONE_DCS_INV : BK4819_TONE_NONE;
 		tv = tone->value;
 	}
-	// Mute RX audio, idle the chip, then set the band path, as the factory does.
+	// BOTH voice and messenger FSK transmit on bus_b = `receiver` = chip "B" in the schematic - the chip whose MOD481B
+	// pin is the microphone's external modulation input, and the chip that always keyed the carrier and the FSK fine.
+	// bus_a = `control` = chip "A" is the RX-side mic monitor, never the transmitter. The old "voice on bus_a" scheme
+	// was wrong: the mic was never on bus_a's modulator, it is injected on bus_b's MOD481B pin through the analog mux.
+	bool voice_tx = !tx_on_receiver;
+	bk4819_t *tx = &receiver;
+	bool uhf = hz >= 400000000u;
 	audio(false);
 	bk4819_set_af(&receiver, BK4819_AF_MUTE);
-	bk4819_set_state(&receiver, BK4819_STATE_IDLE);
-	// Faithful stock (V1.16) TX antenna / front-end state, reverse-engineered from the factory rf_path_set + T/R
-	// control. For both ham bands the RF front-end selects PC15 and PB11 are driven LOW and the band relay PF0 is LOW;
-	// BK4819 REG 0x33 selects the front-end filter (VHF = bit 3 = 0x08, UHF = bit 2 = 0x04) OR'd with the antenna T/R
-	// bit (0x10), which the stock raises only while transmitting. The earlier build never drove PC15/PB11 and toggled
-	// PF0 the wrong way, so the antenna never reached the PA output (only a relay click, no carrier).
-	bool uhf = hz >= 400000000u;
+	bk4819_set_state(&control, BK4819_STATE_IDLE);		// park bus_a (chip A) - not the transmitter
+	bk4819_write(&control, 0x33, 0);
+	bk4819_write(&control, BK4819_REG_PA, 0);
+	// Stock (V1.16) TX antenna / front-end GPIO state: PC15 / PB11 low, band relay PF0 low; BK4819 REG 0x33 selects the
+	// front-end filter (VHF bit 3 = 0x08, UHF bit 2 = 0x04) OR'd with the antenna T/R bit (0x10) while transmitting.
 	at32_pin_write(AT32_GPIO_C, 15, false);
 	at32_pin_write(AT32_GPIO_B, 11, false);
 	at32_pin_write(AT32_GPIO_F, 0, false);
-	bk4819_write(&receiver, 0x33, (uint16_t)((uhf ? 0x04u : 0x08u) | 0x10u));
-	// Silence the tone generators so the microphone modulates the carrier. The analog messenger leaves Tone2 enabled
-	// (REG 0x70 = 0x00E0) for its FSK, and it is kept armed on every FM channel - without clearing it here a voice TX
-	// would modulate with Tone2 (nothing) instead of the mic. The messenger's own FSK TX re-enables Tone2 afterwards.
-	bk4819_write(&receiver, 0x70, 0x0000);
-	bk4819_tx_prepare(&receiver, tt, tv);		// deviation and sub-audio
-	bk4819_write(&receiver, BK4819_REG_PA, tx_pa_word(power));
-	bk4819_tx_tune(&receiver, hz);			// freq, POWER_ON, STATE_TX_MAIN (mic path on)
+	bk4819_set_bandwidth(tx, bw == RADIO_BW_25K ? BK4819_BW_25K : BK4819_BW_12K5);
+	bk4819_write(tx, 0x33, (uint16_t)((uhf ? 0x04u : 0x08u) | 0x10u));
+	bk4819_write(tx, 0x70, 0x0000);			// no tone generator - the external mic audio modulates the carrier
+	bk4819_tx_prepare(tx, tt, tv);			// deviation and sub-audio
+	if (voice_tx) {
+		// Route the external microphone to bus_b (chip A) and key it. The mux idles with MIC1 already on bus_b's MICP
+		// (PC3/PA7 held low - see mic_path), confirmed by the no-RF mic-sense build.
+		//
+		// The decisive correction comes from the stock RT-880 firmware disassembly: the stock BK4819 driver NEVER writes
+		// REG 0x50 (TX audio) - it stays at its 0x0000 power-on reset throughout its working voice transmit. Our shared
+		// driver's analog_mode() forces 0x50 = 0x3B18 (a value reverse-engineered from a different board family), and
+		// that value gates the externally-injected microphone out of the modulator: the mic ADC still digitises it (REG
+		// 0x64 moved), but it never reaches the carrier. The internal tone generator is a separate source, so the tone
+		// still modulated. So: write 0x50 = 0x0000 to match the stock, use the stock's voice-TX state 0xC1FE (REG 0x30),
+		// and the stock's mic gain 0x7D = 0xE950. Deviation (0x40) is already set by bk4819_tx_prepare() above.
+		mic_path_tx(true);
+		tx_mic_peak = 0;
+		// FIRST, tear down the messenger's armed FSK modem. The analog messenger keeps FSK RX armed to listen, which
+		// leaves REG 0x58 bit0 (FSK enable) = 1; an armed FSK modem takes over the TX-DSP modulator input, so the live
+		// mic never reaches the carrier (REG 0x64 still rises - it is measured before the DSP; the tone generator sums
+		// in after the mic chain, so it still modulated). This is the one group of registers WE write that the stock /
+		// nicFW never touch, so the value-diff missed it. Disable it before keying; tx_off() re-arms FSK RX afterwards.
+		bk4819_write(tx, 0x58, 0x0000);			// clear FSK enable: the modulator takes the mic ADC, not the modem
+		bk4819_write(tx, 0x59, 0x0000);			// FSK FIFO/RX/TX enables off
+		// Replicate the nicFW880 voice-TX register sequence (a complete, working firmware for this exact radio, from
+		// its disassembly). Its keying writes, for a no-tone FM voice key: 0x28 = 0x2B38 (compander - we had 0x6B00),
+		// 0x2A = 0x7FFF (we had 0x4F18), 0x47 = 0x6140 (AF-select FM), 0x50 = 0x3B20 (live source - we had 0x3B18),
+		// 0x7D = 0xE952 (mic gain), 0x40 = deviation with the 0x3000 form, and 0x30 = 0xC1FE. These RX-shared
+		// registers are restored in tx_off() so receive keeps working.
+		nicfw_af_base(tx);				// ensure the full working audio-DSP base is in place for TX
+		bk4819_write(tx, 0x31, 0x0000);			// CTCSS/sub-audio enable off (plain voice)
+		bk4819_write(tx, 0x19, 0x1041);			// mic AGC (UV-K5 value) - lifts quiet speech
+		bk4819_write(tx, 0x7D, 0xE97F);			// mic sensitivity near max (base 0xE940 | 0x3F)
+		// Deviation (on-air loudness). The high nibble 0x3 is the TX-deviation mode and must stay 0x3; only the low
+		// 12 bits are the deviation value (so values >= 0x4000 change the mode and kill modulation - that is why 0x5000
+		// went silent). On-air the owner picked 0x3800 as the good level.
+		bk4819_write(tx, 0x40, 0x3800);
+		bk4819_write(tx, BK4819_REG_TX_AUDIO, 0x3B20);	// 0x50 = 0x3B20: nicFW's live-mic source value
+		bk4819_write(tx, BK4819_REG_PA, tx_pa_word(power));
+		bk4819_set_freq(tx, hz);
+		bk4819_write(tx, BK4819_REG_POWER, BK4819_POWER_ON);
+		bk4819_set_state(tx, BK4819_STATE_TX);		// 0xC1FE: nicFW's analog-voice TX state
+	} else {
+		bk4819_write(tx, BK4819_REG_PA, tx_pa_word(power));
+		bk4819_tx_tune(tx, hz);			// FSK burst: STATE_TX_MAIN on bus_b
+	}
+	tx_active = tx;
 	frequency = hz;
 	tx_bw = bw;
 	transmitting = true;
@@ -325,11 +514,19 @@ static bool transmit(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t 
 static void tx_off(void)
 {
 	if (!transmitting) return;
-	bk4819_tx_end(&receiver);			// AF mute, tone off, ENABLES back to RX
-	bk4819_write(&receiver, BK4819_REG_PA, 0);	// PA off
+	bk4819_t *tx = tx_active ? tx_active : &receiver;
+	bk4819_tx_end(tx);				// AF mute, tone off, ENABLES back to RX
+	bk4819_write(tx, BK4819_REG_PA, 0);		// PA off
+	bk4819_write(tx, 0x33, 0);			// drop this chip's T/R + front-end
 	at32_pin_write(AT32_GPIO_F, 0, false);		// relay back to the RX path
+	mic_path_tx(false);				// mux back to RX routing, mic amp off
+	tx_active = NULL;
 	transmitting = false;
-	do_tune(frequency, tx_bw, am_mode);		// re-establish RX on the same frequency
+	do_tune(frequency, tx_bw, am_mode);		// re-establish RX on the same frequency (bus_b)
+	// Restore the RX AF registers the voice-TX path overwrote (do_tune does not re-run the full AF init), so receive
+	// keeps working after a key-up: analog_mode resets 0x2A / 0x47 / 0x50 / 0x7E / 0x4D, and 0x28 is reset explicitly.
+	bk4819_analog_mode(tx);
+	nicfw_af_base(tx);				// restore the nicFW audio-DSP base (analog_mode reset parts of it) so RX works
 	audio_apply();
 #if CONFIG_MESSENGER
 	// A voice/FSK transmit leaves the chip in plain FM RX; re-arm the analog messenger so it keeps listening (do_tune
@@ -367,7 +564,10 @@ static bool msg_tx_frame(const uint16_t *w)
 	bool was_armed = msg_rx_armed;
 	bool ok = false;
 	msg_rx_armed = false;
-	if (transmit(frequency, tx_bw, 1, NULL)) {	// key TX (refused out of a TX band)
+	tx_on_receiver = true;				// the messenger FSK burst keys bus_b (the RX chip), where it works
+	bool keyed = transmit(frequency, tx_bw, 1, NULL);	// refused out of a TX band
+	tx_on_receiver = false;
+	if (keyed) {
 		bk4819_fsk_setup(&receiver);
 		ok = bk4819_fsk_tx(&receiver, w, MSG_FSK_WORDS);
 		tx_off();
@@ -533,6 +733,23 @@ static void status(radio_status_t *value)
 	last_rssi = value->rssi_dbm;
 	last_noise = value->noise;
 	voice_level = bk4819_read(&receiver, 0x64);
+	// Mic/voice amplitude (REG 0x64) on BOTH chips, so the diagnostic shows which BK4819 actually sees the microphone.
+	voice_level_b = voice_level;
+	voice_level_a = bk4819_read(&control, 0x64);
+	// While transmitting voice, latch the peak mic amplitude on the TX chip, so it can be read AFTER releasing PTT:
+	// a high peak means the mic ADC IS live during the real transmit (so the fault is past the ADC); ~0 means the
+	// transmit config kills the ADC (unlike the no-RF probe, where it responded).
+	if (transmitting) {
+		bk4819_t *t = tx_active != NULL ? tx_active : &control;
+		uint16_t m = (uint16_t)(bk4819_read(t, 0x64) & 0x7FFFu);
+		if (m > tx_mic_peak) tx_mic_peak = m;
+		// Live register readback on the TX chip, so the diagnostic shows what actually stuck during the real transmit:
+		// 0x30 should read the voice-TX state, 0x40 the deviation (0 = modulation dead), 0x50 the audio source, 0x70 tone.
+		tx_r30 = bk4819_read(t, 0x30);
+		tx_r40 = bk4819_read(t, 0x40);
+		tx_r50 = bk4819_read(t, 0x50);
+		tx_r70 = bk4819_read(t, 0x58);	// FSK enable readback (bit0) - confirms the modem is off during voice TX
+	}
 #if CONFIG_MESSENGER
 	rt880_msg_service();	// drain the FSK FIFO at the poll rate so the messenger can decode without overrun
 #endif
@@ -554,12 +771,30 @@ bool rt880_rf_diag(uint8_t line, char *buf, uint8_t len)
 	case 4: snprintf(buf, len, "Audio %s V:%u", audio_open ? "OPEN" : "MUTE", volume_percent); break;
 	case 5: snprintf(buf, len, "RSSI:%d N:%u", last_rssi, last_noise); break;
 	case 6: snprintf(buf, len, "PC4:%u PF8:%u", (unsigned)at32_pin_read(AT32_GPIO_C, 4), (unsigned)at32_pin_read(AT32_GPIO_F, 8)); break;
-	case 7: snprintf(buf, len, "30:%04X 37:%04X", enables_readback, power_readback); break;
-	case 8: snprintf(buf, len, "Voice:%04X", voice_level); break;
+	case 7: snprintf(buf, len, "mic:%04X 40:%04X", tx_mic_peak, tx_r40); break;
+	case 8: snprintf(buf, len, "50:%04X 58:%04X", tx_r50, tx_r70); break;
+	case 9: {
+		// board.c's battery ADC (PA7, ch7). rt880_batt_raw is refreshed by the UI's periodic battery poll; show it
+		// and the computed battery mV (raw*3300/4095 * 347/47) so a reading confirms the ADC works and sets the scale.
+		extern uint16_t rt880_batt_raw;
+		unsigned raw = rt880_batt_raw;
+		unsigned mv = raw * 3300u / 4095u * 347u / 47u;
+		snprintf(buf, len, "BATTraw:%u mv:%u", raw, mv);
+		break;
+	}
+	case 10: {
+		// W25Q32 data-flash probe: re-reads the JEDEC ID (a W25Q32 answers EF 40 16) so a reading confirms the SPI
+		// bit-bang reaches the chip and settings storage can mount. "P:1" = present (storage can persist).
+		extern uint32_t rt880_flash_jedec(void);
+		uint32_t j = rt880_flash_jedec();
+		snprintf(buf, len, "FLASH P:%u ID:%02X%02X%02X", (unsigned)(j >> 24) & 1u,
+			 (unsigned)(j >> 16) & 0xFFu, (unsigned)(j >> 8) & 0xFFu, (unsigned)j & 0xFFu);
+		break;
+	}
 #ifdef RT880_PIN_FINDER
-	case 9: snprintf(buf, len, "A:%04X B:%04X", at32_port_inputs(AT32_GPIO_A), at32_port_inputs(AT32_GPIO_B)); break;
-	case 10: snprintf(buf, len, "C:%04X D:%04X", at32_port_inputs(AT32_GPIO_C), at32_port_inputs(AT32_GPIO_D)); break;
-	case 11: snprintf(buf, len, "F:%04X (press PTT)", at32_port_inputs(AT32_GPIO_F)); break;
+	case 11: snprintf(buf, len, "A:%04X B:%04X", at32_port_inputs(AT32_GPIO_A), at32_port_inputs(AT32_GPIO_B)); break;
+	case 12: snprintf(buf, len, "C:%04X D:%04X", at32_port_inputs(AT32_GPIO_C), at32_port_inputs(AT32_GPIO_D)); break;
+	case 13: snprintf(buf, len, "F:%04X (press PTT)", at32_port_inputs(AT32_GPIO_F)); break;
 #endif
 	default: return false;
 	}

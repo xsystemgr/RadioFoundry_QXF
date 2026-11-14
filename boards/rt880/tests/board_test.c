@@ -136,11 +136,15 @@ int main(void)
 	assert(digits == 0x3FFu);
 	assert(ptt == 1);		// exactly one PTT binding
 	assert(board.keymap[11].short_action == ACT_VFO_TOGGLE);
+	// The W25Q32 SPI-NOR driver: the host mock has no real chip, so the JEDEC probe fails and init() reports absent and
+	// read/write/erase refuse - but the static geometry and the storage map are now real. The probe legitimately
+	// toggles the SPI pins, so the "nothing drove GPIO" check that follows starts from a clean count.
 	assert(!board.flash->init());
 	assert(!board.flash->write(0, "x", 1));
 	assert(!board.flash->erase(0));
-	assert(board.flash->map == NULL && board.flash->size == 0);
-	assert(writes == 0);
+	assert(board.flash->map != NULL && board.flash->size == 0x400000u && board.flash->erase_size == 4096u);
+	assert(board.flash->map->settings_size >= 2u * 4096u && board.flash->map->native_size == 0u);
+	writes = 0;
 	board.input->init();
 	for (pressed = 0; pressed < 16; pressed++) {
 		assert(board.input->scan() == (1u << pressed));

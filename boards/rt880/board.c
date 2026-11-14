@@ -71,9 +71,9 @@ static const si4732_hal_cfg_t bcast_cfg = {
 	.bus = &si_bus, .addr7 = 0x11u, .delay_ms = hal_delay_ms,
 	.enable = si_enable, .audio_path = si_audio, .start_khz = 7100u,
 };
-void board_init(void) { si4732_hal_init(&bcast_cfg); }
+void board_init(void) { extern const hal_flash_t rt880_flash; rt880_flash.init(); si4732_hal_init(&bcast_cfg); }
 #else
-void board_init(void) {}
+void board_init(void) { extern const hal_flash_t rt880_flash; rt880_flash.init(); }
 #endif
 
 static void lcd_byte(uint8_t value)
@@ -191,21 +191,78 @@ static const keymap_entry_t keys[] = {
 	{ .bit = PTT_BIT, .short_action = ACT_PTT, .long_action = ACT_PTT, .raw_edges = true },	// PB6: FM voice PTT
 };
 
-static bool flash_init(void) { return false; }
-static bool flash_read(uint32_t address, void *buf, uint32_t len)
+extern const hal_flash_t rt880_flash;	// boards/rt880/flash_rt880.c (W25Q32 SPI NOR, bit-banged)
+// Battery sense: the stock firmware reads it on ADC1 ORDINARY SEQUENCE 1 = channel 7 (PA7) - confirmed by reverse-
+// engineering the factory image (adc_ordinary_channel_set(ADC1, 7, 1, ...) feeding DMA buffer[0], then V = raw*3/51+2
+// in tenths of a volt). The divider (BATT -> ~300K -> PA7 -> ~47K -> GND) gives Vbatt = Vadc * 347/47; a full 2S pack
+// (8.4 V) lands at Vadc ~1.13 V, raw ~1400, matching the stock. (An earlier build used channel 6/PA6, which read an
+// unrelated ~2.9 V rail - hence the bogus ~22 V reading.)
+// AT32F423 ADC1 is the Artery ADC (base 0x40012000): STS 0x00 (OCCE = bit 1), CTRL2 0x08 (ADCEN bit0, ADCAL bit2,
+// ADCALINIT bit3, EOCSFEN bit10, OCTESEL [27:24], OCETE [29:28], OCSWTRG bit30), SPT2 0x10 (cspt7 [23:21]),
+// OSQ1 0x2C (OCLEN [24:20]), OSQ3 0x34 (osn1 [4:0]), ODT 0x4C. The ADC1 clock is CRM APB2EN (0x40023844) bit 8, and
+// the ADC clock divider is ADCCOM CCTRL (0x40012304) adcdiv [19:16] off HCLK. The 300K source is high-impedance, so
+// channel 7 gets the longest sample time. (Bit positions confirmed against the AT32F423 reference manual / firmware
+// library - the Artery ADC does NOT share the classic STM32F1/AT32F403 CTRL2/STS layout.)
+#define REGW(a) (*(volatile uint32_t *)(uintptr_t)(a))
+#define ADC1		0x40012000u
+#define CRM_APB2EN	0x40023844u	// ADC1EN = bit 8
+#define ADCCOM_CCTRL	0x40012304u	// adcdiv [19:16]
+#define BATT_CH		7u		// PA7 (ordinary sequence 1 in the stock firmware)
+uint16_t rt880_batt_raw;	// last raw 12-bit ADC reading, surfaced on a diagnostics line for bring-up/calibration
+
+static bool adc_ready;
+
+static void adc_setup(void)
 {
-	(void)address; (void)buf; (void)len; return false;
+	REGW(CRM_APB2EN) |= 1u << 8;			// CRM APB2EN: ADC1 peripheral clock
+	REGW(ADCCOM_CCTRL) = (REGW(ADCCOM_CCTRL) & ~(0xFu << 16)) | (0x6u << 16);	// adcdiv = HCLK/8 (~6 MHz)
+	// PA7 to analog: GPIOA CFGR (MODER) field = 0b11, no pull.
+	REGW(0x40020000u) |= 3u << (BATT_CH * 2);
+	REGW(0x4002000Cu) &= ~(3u << (BATT_CH * 2));
+	REGW(ADC1 + 0x08u) |= 1u;			// CTRL2: ADCEN
+	for (uint32_t i = 0; i < 100000u && !(REGW(ADC1 + 0x00u) & (1u << 6)); i++) {}	// wait STS RDY (bit 6)
+	// Calibration: reset the calibration (ADCALINIT, bit 3), then run it (ADCAL, bit 2); each self-clears.
+	REGW(ADC1 + 0x08u) |= 1u << 3;
+	for (uint32_t i = 0; i < 100000u && (REGW(ADC1 + 0x08u) & (1u << 3)); i++) {}
+	REGW(ADC1 + 0x08u) |= 1u << 2;
+	for (uint32_t i = 0; i < 100000u && (REGW(ADC1 + 0x08u) & (1u << 2)); i++) {}
+	REGW(ADC1 + 0x10u) = (REGW(ADC1 + 0x10u) & ~(7u << 21)) | (7u << 21);	// SPT2: channel 7 longest sample time
+	REGW(ADC1 + 0x2Cu) &= ~(0x1Fu << 20);		// OSQ1: ordinary sequence length = 1 conversion (OCLEN = 0)
+	REGW(ADC1 + 0x34u) = (REGW(ADC1 + 0x34u) & ~0x1Fu) | BATT_CH;	// OSQ3: first (only) channel = 7
+	REGW(ADC1 + 0x08u) |= 1u << 10;			// CTRL2: EOCSFEN - set OCCE at end of each conversion
+	// Ordinary trigger = software (OCTESEL = 0x7) with a rising edge (OCETE = 0x1), as the library configures it.
+	REGW(ADC1 + 0x08u) = (REGW(ADC1 + 0x08u) & ~((0xFu << 24) | (3u << 28))) | (0x7u << 24) | (0x1u << 28);
+	adc_ready = true;
 }
-static bool flash_write(uint32_t address, const void *buf, uint32_t len)
+
+static uint16_t adc_read_batt(void)
 {
-	(void)address; (void)buf; (void)len; return false;
+	if (!adc_ready) adc_setup();
+	REGW(ADC1 + 0x00u) = ~(1u << 1);		// clear STS OCCE (rc_w0: write 0 to bit 1, 1 elsewhere)
+	REGW(ADC1 + 0x08u) |= 1u << 30;			// CTRL2: OCSWTRG - start the ordinary conversion
+	for (uint32_t i = 0; i < 1000000u && !(REGW(ADC1 + 0x00u) & (1u << 1)); i++) {}	// poll OCCE (bit 1)
+	return (uint16_t)(REGW(ADC1 + 0x4Cu) & 0xFFFu);	// ODT: 12-bit result
 }
-static bool flash_erase(uint32_t address) { (void)address; return false; }
-static const hal_flash_t flash = {
-	.init = flash_init, .read = flash_read, .write = flash_write, .erase = flash_erase,
-};
-static uint16_t battery_mv(void) { return 0; }
-static uint8_t battery_pct(void) { return 0; }
+
+static uint16_t battery_mv(void)
+{
+	uint32_t acc = 0;
+	for (int i = 0; i < 8; i++) acc += adc_read_batt();	// average 8 samples to settle the jitter
+	uint16_t raw = (uint16_t)(acc / 8u);
+	rt880_batt_raw = raw;
+	// Vadc_mv = raw * 3300 / 4095; Vbatt = Vadc * 347/47 (the on-board divider).
+	uint32_t vadc = (uint32_t)raw * 3300u / 4095u;
+	return (uint16_t)(vadc * 347u / 47u);
+}
+
+// 2S Li-ion pack: ~8.4 V full, ~6.0 V empty, clamped 0..100 (coarse linear gauge).
+static uint8_t battery_pct(void)
+{
+	uint16_t mv = battery_mv();
+	if (mv <= 6000u) return 0;
+	if (mv >= 8300u) return 100;
+	return (uint8_t)((mv - 6000u) * 100u / (8300u - 6000u));
+}
 static int8_t volume(void) { return -1; }
 static bool switch_on(void) { return true; }
 static void led(uint8_t which, bool on) { (void)which; (void)on; }
@@ -373,7 +430,7 @@ const board_t board = {
 	.caps = CAP_KEYPAD | (CONFIG_AM_RX ? CAP_AM_RX : 0) | (CONFIG_BCAST_FM ? CAP_BCAST_FM : 0),
 	.bands = bands, .band_count = sizeof(bands) / sizeof(bands[0]), .power_count = 2, .power_names = power_names,
 	.display = &display, .input = &input, .keymap = keys, .keymap_len = sizeof(keys) / sizeof(keys[0]),
-	.radio = &rt880_radio, .power = &power, .flash = &flash, .diag_line = diag,
+	.radio = &rt880_radio, .power = &power, .flash = &rt880_flash, .diag_line = diag,
 #if CONFIG_BCAST_FM
 	.bcast = &si4732_hal,
 #endif

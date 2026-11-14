@@ -467,7 +467,7 @@ bool codeplug_openfw_decode(const uint8_t *r, channel_t *out)
 		return false;
 	}
 	copy_name(out->name, &r[CH_NAME], CODEPLUG_NAME_LEN);
-	out->mode = r[CH_MODE] == 1 ? RADIO_MODE_DMR : RADIO_MODE_FM;
+	out->mode = r[CH_MODE] == 1 ? RADIO_MODE_DMR : r[CH_MODE] == 2 ? RADIO_MODE_AM : RADIO_MODE_FM;
 	out->bw = (r[CH_FLAG4] & FLAG4_25K) ? RADIO_BW_25K : RADIO_BW_12K5;
 	out->rx_tone = tone(le16(&r[CH_RX_TONE]));
 	out->tx_tone = tone(le16(&r[CH_TX_TONE]));
@@ -516,7 +516,7 @@ void codeplug_openfw_encode(const channel_t *ch, uint8_t *r)
 	put_name(&r[CH_NAME], ch->name, CODEPLUG_NAME_LEN);
 	put_freq(&r[CH_RX], ch->rx_hz);
 	put_freq(&r[CH_TX], ch->tx_hz);
-	r[CH_MODE] = ch->mode == RADIO_MODE_DMR ? 1 : 0;
+	r[CH_MODE] = ch->mode == RADIO_MODE_DMR ? 1 : ch->mode == RADIO_MODE_AM ? 2 : 0;
 	r[CH_POWER] = ch->power == CODEPLUG_POWER_DEFAULT ? 0 : power_to_byte(ch->power);
 	put16(&r[CH_RX_TONE], tone_word(&ch->rx_tone));
 	put16(&r[CH_TX_TONE], tone_word(&ch->tx_tone));

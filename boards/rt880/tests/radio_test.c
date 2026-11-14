@@ -18,6 +18,13 @@ static const band_t test_bands[] = {
 };
 const board_t board = { .bands = test_bands, .band_count = 3 };
 
+// Defined in board.c (the battery ADC raw sample), which this test does not link; provide it so the
+// diagnostics readback in radio.c resolves.
+uint16_t rt880_batt_raw;
+
+// Defined in flash_rt880.c, which this test does not link either; stub it for the flash diagnostics line.
+uint32_t rt880_flash_jedec(void) { return 0; }
+
 typedef struct {
 	bool cs, driving, reading;
 	uint32_t shift;
@@ -40,19 +47,16 @@ static void select_chip(unsigned index, bool high)
 		assert(c->bits == 24);
 		unsigned reg = (c->shift >> 16) & 0x7F;
 		uint16_t value = (uint16_t)c->shift;
-		// The control chip (bus_a = index 0) never transmits: its PA stays off and
-		// its enables never set the PA / mic-ADC / TX-DSP bits. The receiver (index 1)
-		// may transmit, so it is allowed PA bias and TX enables.
-		if (reg == 0x36 && index == 0) assert(value == 0);
-		if (reg == 0x30 && index == 0) {
-			assert((value & 0x400Eu) == 0);
-			assert(value == 0);
-		}
+		// On a voice transmit BOTH chips enter the TX stage (bus_a modulates + drives the PA, bus_b holds the antenna
+		// route), so the safety invariant is not "one chip in TX" but "one chip with its PA on": whenever a chip's
+		// REG 0x36 raises the PA enable (bit 7 of the low byte), the other chip's PA must be off.
+		if (reg == 0x36 && (value & 0x80u))
+			assert((chips[1 - index].regs[0x36] & 0x80u) == 0);
 		if (reg == 0x33) {
-			// REG 0x33 on the receiver (bus_b = index 1): RX uses the band-path bits (0x10 / 0x20); TX uses the
-			// front-end filter bit (VHF 0x08 / UHF 0x04) OR'd with the antenna T/R bit 0x10 (so 0x18 / 0x14).
-			// Only bits 2-5 are ever touched; the control chip (index 0) never drives it.
-			assert(index == 1 ? (value & ~0x3Cu) == 0 : value == 0);
+			// REG 0x33 carries the RX band path (0x10 / 0x20) or the TX front-end filter (VHF 0x08 / UHF 0x04)
+			// OR'd with the antenna T/R bit 0x10 - bits 2-5 - plus the power-on default 0x0003 (bits 0-1) that the
+			// full main init briefly writes before clearing it. Nothing above bit 5 is ever driven.
+			assert((value & ~0x3Fu) == 0);
 		}
 		if (reg != 0) c->regs[reg] = value;
 		c->writes++; frames++;
@@ -94,6 +98,11 @@ void at32_pin_output(uint32_t port, unsigned pin, bool high)
 }
 void at32_pin_input_floating(uint32_t port, unsigned pin)
 {
+	if (port == AT32_GPIO_A && pin == 2) return;	// external audio-codec data-in line (codec_init), not a BK4819 bus
+	// Mic-routing lines left floating for the board's hardware pulls (mic_path_init), matching the stock firmware.
+	if (port == AT32_GPIO_C && pin == 3) return;	// ANC-POWER-EN
+	if (port == AT32_GPIO_A && pin == 7) return;	// RXTS-SW
+	if (port == AT32_GPIO_B && pin == 8) return;	// mic select (ENB)
 	assert(port == AT32_GPIO_C && (pin == 6 || pin == 9));
 	chips[pin == 6 ? 0 : 1].driving = false;
 }
@@ -136,7 +145,9 @@ int main(void)
 	rt880_radio.init();
 	// Receiver is the chip on bus_b (PF6/PA8/PC9) = chips[1]; bus_a = idle control.
 	assert(chips[1].regs[0x30] == BK4819_STATE_IDLE_MAIN);
-	assert(chips[0].regs[0x30] == 0 && chips[0].regs[0x33] == 0);
+	// bus_a (the TX chip) now gets the same static init (so the mic path is set up), parked at IDLE_MAIN with its
+	// RF front-end GPIO (REG 0x33) clear - it only drives that at key time.
+	assert(chips[0].regs[0x30] == BK4819_STATE_IDLE_MAIN && chips[0].regs[0x33] == 0);
 	assert(rt880_radio.rx(145500000, RADIO_BW_25K, NULL));
 	assert(chips[1].regs[0x33] == 0x10 && chips[1].regs[0x30] == BK4819_STATE_RX);
 	assert((((uint32_t)chips[1].regs[0x39] << 16) | chips[1].regs[0x38]) == 14550000);
@@ -192,14 +203,21 @@ int main(void)
 	assert(gpio_writes == before);
 	// TX: allowed in the VHF/UHF ham ranges, refused in the air band and out of band.
 	assert(rt880_radio.rx(145500000, RADIO_BW_25K, NULL));
+	// Voice and FSK both transmit on bus_b (receiver = chips[1]) = schematic chip "A", whose MICP pin carries the
+	// externally-routed microphone; bus_a (control = chips[0]) is parked. The mic mux idles with MIC1 already on bus_b
+	// (RXTS-SW = PA7 and ANC-POWER-EN = PC3 held LOW), so a voice key just holds those low and keys the chip. Voice
+	// uses STATE_TX (0xC1FE) - the stock RT-880 firmware's analog-voice TX state - and leaves REG 0x50 at its reset
+	// value (the stock never writes it), which is what lets the externally-injected mic reach the modulator.
 	assert(rt880_radio.tx(145500000, RADIO_BW_25K, 0, NULL));	// VHF, LO
-	assert(chips[1].regs[0x30] == BK4819_STATE_TX_MAIN);
-	assert((chips[1].regs[0x36] & 0x80u) != 0 && chips[0].regs[0x36] == 0);	// receiver PA on, control off
+	assert(chips[1].regs[0x30] == BK4819_STATE_TX);			// bus_b stock voice-TX stage (external mic reaches carrier)
+	assert(chips[1].regs[0x50] == 0x3B20);
+	assert((chips[1].regs[0x36] & 0x80u) != 0 && chips[0].regs[0x36] == 0);	// bus_b PA on, bus_a parked off
 	assert((chips[1].regs[0x36] >> 8) != 0);			// PA bias (high byte) nonzero - else no RF radiates
 	assert(chips[1].regs[0x33] == (0x08u | 0x10u));			// VHF front-end (bit3) + antenna T/R (bit4)
 	assert(!pins[5][0]);						// VHF -> PF0 low (stock rf_path_set)
 	rt880_radio.tx_off();
-	assert(chips[1].regs[0x30] == BK4819_STATE_RX && !pins[5][0]);	// back to RX, relay low
+	assert(!pins[5][0]);						// relay low
+	assert(chips[1].regs[0x30] == BK4819_STATE_RX && chips[1].regs[0x33] == 0x10);	// bus_b restored to VHF RX
 	assert(rt880_radio.tx(433500000, RADIO_BW_25K, 1, NULL) && !pins[5][0]);	// UHF, HI -> PF0 low
 	assert(chips[1].regs[0x33] == (0x04u | 0x10u));			// UHF front-end (bit2) + antenna T/R (bit4)
 	rt880_radio.tx_off();

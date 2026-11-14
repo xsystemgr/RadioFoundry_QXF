@@ -59,11 +59,31 @@ static bool hub_has_last(void)
 	return !ui_has_action(ACT_CONTEXT);	// few-key boards: "Last caller" stands in for CONTEXT (7.5)
 }
 
-static uint16_t hub_count(void) { return hub_has_last() ? 8 : 7; }
+// Whether a hub entry is shown. "Last caller", "Contacts" and "Recent" are DMR concepts (heard callers, qdmr
+// contacts, recent digital calls), so on an analog-only build (CONFIG_DMR = 0, e.g. the RT-880) they are hidden;
+// DMR radios keep them. "Last caller" is also dropped on boards that have a dedicated CONTEXT key.
+static bool hub_visible(uint8_t e)
+{
+	if (e == HUB_LAST_CALLER && !hub_has_last()) return false;
+	if (!CONFIG_DMR && (e == HUB_LAST_CALLER || e == HUB_CONTACTS || e == HUB_RECENT)) return false;
+	return true;
+}
+
+static uint16_t hub_count(void)
+{
+	uint16_t n = 0;
+	for (uint8_t e = 0; e <= HUB_SETTINGS; e++) if (hub_visible(e)) n++;
+	return n;
+}
 
 static uint8_t hub_entry(uint16_t i)
 {
-	return (uint8_t)(hub_has_last() ? i : i + 1u);
+	uint16_t n = 0;
+	for (uint8_t e = 0; e <= HUB_SETTINGS; e++) {
+		if (!hub_visible(e)) continue;
+		if (n++ == i) return e;
+	}
+	return HUB_SETTINGS;
 }
 
 static void hub_item(uint16_t i, ui_item_t *it)
@@ -1641,7 +1661,8 @@ static void ced_build(void)
 	for (uint8_t r = 0; r < CE_COUNT; r++) {
 		bool fm_only = r == CE_BW || r == CE_RX_TONE || r == CE_TX_TONE || r == CE_VOX;
 		bool dmr_only = r >= CE_CC && r <= CE_ALIAS2;
-		if ((fm_only && dmr) || (dmr_only && !dmr) || (r == CE_MODE && !CONFIG_DMR))
+		// The Mode field shows when there's a choice to make: DMR builds (FM/DMR) or AM-capable analog boards (FM/AM).
+		if ((fm_only && dmr) || (dmr_only && !dmr) || (r == CE_MODE && !CONFIG_DMR && !radio_am_capable()))
 			continue;
 		if ((r == CE_ZONES || r == CE_GO || r == CE_SHARE || r == CE_SAVE_NEW) && fresh)
 			continue;
@@ -1821,7 +1842,7 @@ static void chinfo_item(uint16_t i, ui_item_t *it)
 		sb_u32(&b, ced_num, 1);
 		break;
 	case CE_MODE:
-		sb_str(&b, ch->mode == RADIO_MODE_DMR ? "DMR" : "FM");
+		sb_str(&b, ch->mode == RADIO_MODE_DMR ? "DMR" : ch->mode == RADIO_MODE_AM ? "AM" : "FM");
 		break;
 	case CE_RX:
 		sb_freq(&b, ch->rx_hz);
@@ -2171,7 +2192,13 @@ static void chinfo_select(uint16_t i, bool hold)
 	uint8_t r = ced_rows[i];
 	switch (r) {
 	case CE_NAME: ui_text_open(c->name, CODEPLUG_NAME_LEN); break;
-	case CE_MODE: c->mode = c->mode == RADIO_MODE_DMR ? RADIO_MODE_FM : RADIO_MODE_DMR; break;
+	case CE_MODE:
+#if CONFIG_DMR
+		c->mode = c->mode == RADIO_MODE_DMR ? RADIO_MODE_FM : RADIO_MODE_DMR;	// DMR builds: FM <-> DMR
+#else
+		c->mode = c->mode == RADIO_MODE_AM ? RADIO_MODE_FM : RADIO_MODE_AM;	// analog AM-capable: FM <-> AM
+#endif
+		break;
 	case CE_RX:
 	case CE_TX:
 	case CE_ID:

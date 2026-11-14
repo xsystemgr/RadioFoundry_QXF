@@ -41,11 +41,38 @@ DIRS := core/app core/radio core/ui core/input core/codeplug core/settings core/
 ifeq ($(CONFIG_BCAST_FM),y)
 DIRS += drivers/bcast/si4732 drivers/bus/i2c_gpio
 endif
+# The build tag shown on the Home status strip (RFOUNDRY_GIT) so the operator can tell which image is flashed. Bump it
+# each lab build; a diagnostic variant below overrides it with its own name. Override on the command line: RT880_VER=v7.
+RT880_VER ?= v5-mic
 # MSG=1: the GOGUFW-compatible analog messenger (BK4819 FSK). Build on the lean HF base: make HF=1 MSG=1 image
 ifeq ($(MSG),1)
 DIRS += core/messenger
 TARGET := $(BUILD)/rfoundry_rt880_MSG_UNTESTED
 endif
+# MIC_PROBE=1: a no-RF bench diagnostic. Runs the mic ADC on both BK4819 with the PA off and the antenna unrouted, so
+# Diagnostics line 8 "mA:xxxx mB:xxxx" tracks the microphone amplitude per chip - the number that moves when you speak
+# is the chip the mic is wired to (neither moving means the mic is not on a BK4819 at all).
+ifeq ($(MIC_PROBE),1)
+HF_DEFS += -DRT880_MIC_PROBE
+TARGET := $(BUILD)/rfoundry_rt880_MICPROBE_UNTESTED
+RT880_VER := MIC-PROBE
+endif
+# TONE_TEST=1: a voice PTT emits a fixed 1 kHz tone from the BK4819 tone generator instead of the mic, to isolate
+# whether the modulator + RF path works (tone heard) or not (silent) - independent of the microphone routing.
+ifeq ($(TONE_TEST),1)
+HF_DEFS += -DRT880_TX_TONE_TEST
+TARGET := $(BUILD)/rfoundry_rt880_TONETEST_UNTESTED
+RT880_VER := TONE-TEST
+endif
+# TONE_MIC=1: decisive diagnostic - a 1 kHz tone is injected WITH the mic ADC bit left on, to tell whether enabling the
+# mic mutes the modulator (tone vanishes) or not (tone heard = pure mic-source routing fault).
+ifeq ($(TONE_MIC),1)
+HF_DEFS += -DRT880_TONE_MIC
+RT880_VER := TONE+MIC
+endif
+# Name every image after its on-screen version (RT880_VER), so the downloaded .bin can never be confused with another
+# build - the file name matches exactly what the radio shows on its Home screen. '+' is swapped for '-' for the path.
+TARGET := $(BUILD)/rfoundry_rt880_$(subst +,-,$(RT880_VER))_UNTESTED
 SRC := $(foreach d,$(DIRS),$(wildcard $(d)/*.c))
 SRC := $(filter-out core/app/task_stack.c core/app/watchdog.c,$(SRC))
 RTOS := third_party/FreeRTOS-Kernel
@@ -54,7 +81,8 @@ OBJ := $(addprefix $(BUILD)/,$(SRC:.c=.o)) $(BUILD)/platform/at32f423/startup.o
 CPU := -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 DEFS := $(FEATURE_DEFS) $(HF_DEFS) -DGFX_INDEXED=1 -DGFX_FB_BYTES=9600u -DGFX_MAX_ROWS=160u \
 	-DCONFIG_MESSENGER=$(if $(filter 1,$(MSG)),1,0) \
-	-DRFOUNDRY_BOARD_ID=\"rt880-lab\" -DRFOUNDRY_GIT=\"private-lab\"
+	-DRFOUNDRY_BOARD_ID=\"rt880-lab\" -DRFOUNDRY_GIT=\"$(RT880_VER)\" \
+	$(if $(RT880_PA_BIAS),-DRT880_PA_BIAS=$(RT880_PA_BIAS),)
 INC := -Ihal -Icore -Idrivers -Iboards/rt880 -Iplatform/at32f423 -I$(BUILD)/gen -I$(RTOS)/include -I$(RTOS)/portable/GCC/ARM_CM4F
 CFLAGS := $(CPU) -Os -g3 -std=gnu11 -ffunction-sections -fdata-sections -fno-common -flto=auto -fcallgraph-info=su -MMD -MP \
 	-Wall -Wextra -Wshadow -Wno-unused-parameter $(DEFS) $(INC)
@@ -63,6 +91,13 @@ LDFLAGS := $(CPU) -Os -flto=auto -fcallgraph-info=su -Tboards/rt880/memory.ld -W
 all: $(TARGET).elf
 $(TARGET).elf: $(OBJ) boards/rt880/memory.ld
 	$(CC) $(LDFLAGS) $(OBJ) -lm -o $@
+# RT880_VER is passed on the command line, so changing it does NOT touch any file make tracks - the objects that bake
+# RFOUNDRY_GIT (the on-screen / splash / About version) would keep a stale version while the image file name changes.
+# A stamp file updated only when RT880_VER changes forces exactly those objects to recompile, so the baked version
+# always matches the file name and what the radio shows.
+VERSTAMP := $(BUILD)/verstamp
+$(shell mkdir -p $(BUILD); printf '%s' '$(RT880_VER)|$(RT880_PA_BIAS)' | cmp -s - $(VERSTAMP) 2>/dev/null || printf '%s' '$(RT880_VER)|$(RT880_PA_BIAS)' > $(VERSTAMP))
+$(BUILD)/core/ui/ui_screens.o $(BUILD)/core/ui/ui.o $(BUILD)/core/ui/ui_menus.o $(BUILD)/boards/rt880/radio.o: $(VERSTAMP)
 $(OBJ): boards/rt880/Makefile config/features.mk $(BUILD)/gen/rfoundry_about.h
 $(BUILD)/gen/rfoundry_about.h: AUTHORS platform/at32f423/THIRD_PARTY tools/gen_about.py
 	python3 tools/gen_about.py AUTHORS platform/at32f423/THIRD_PARTY $@
@@ -78,7 +113,7 @@ image: $(TARGET).elf
 test:
 	@mkdir -p $(BUILD)
 	cc -std=c11 -Wall -Wextra -Werror -DCONFIG_BCAST_FM=0 -Ihal -Icore -Idrivers -Iplatform/at32f423 \
-		boards/rt880/board.c boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c drivers/display/st7789/st7789.c core/input/input_engine.c boards/rt880/tests/board_test.c -o $(BUILD)/board-test
+		boards/rt880/board.c boards/rt880/flash_rt880.c boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c drivers/display/st7789/st7789.c core/input/input_engine.c boards/rt880/tests/board_test.c -o $(BUILD)/board-test
 	$(BUILD)/board-test
 	cc -std=c11 -Wall -Wextra -Werror -DCONFIG_BCAST_FM=0 -Ihal -Icore -Idrivers -Iplatform/at32f423 \
 		boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c boards/rt880/tests/radio_test.c -o $(BUILD)/radio-test

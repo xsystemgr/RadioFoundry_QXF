@@ -17,7 +17,11 @@ bool radio_am_capable(void)
 
 bool radio_am_channel(const channel_t *ch)
 {
-	return radio_am_capable() && ch->mode == RADIO_MODE_FM && radio_am_band(ch->rx_hz);
+	if (!radio_am_capable())
+		return false;
+	if (ch->mode == RADIO_MODE_AM)			// user-forced AM (any supported frequency)
+		return true;
+	return ch->mode == RADIO_MODE_FM && radio_am_band(ch->rx_hz);	// auto-AM: an FM channel in the AM band
 }
 
 bool radio_am_tx_refused(uint32_t hz)

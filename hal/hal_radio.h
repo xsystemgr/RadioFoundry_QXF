@@ -8,7 +8,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR } radio_mode_t;
+// RADIO_MODE_AM is a user-forced analog AM channel (vs auto-AM, which is an FM channel that happens to sit in the AM
+// band). It is treated exactly like FM everywhere the RF mode matters (set_mode gets FM; the board does AM via rx_am);
+// only radio_am_channel() and the UI label distinguish it. Value 2 keeps the codeplug mode byte backward-compatible.
+typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR, RADIO_MODE_AM } radio_mode_t;
 typedef enum { RADIO_BW_12K5, RADIO_BW_25K } radio_bw_t;
 
 typedef enum { TONE_NONE, TONE_CTCSS, TONE_DCS, TONE_DCS_INV } tone_type_t;
