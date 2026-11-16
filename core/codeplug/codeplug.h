@@ -82,7 +82,12 @@ bool codeplug_zones_stored(void);
 
 // --- Editing. Each returns false if nothing is stored and can't be (no flash), the argument is invalid, or the
 // flash failed. A change bumps codeplug_serial(), so the radio core knows to re-read its channel ---
+// A board may cap the channel count (a multiple of 128, the open-firmware bank size) so its codeplug fits a small flash
+// region: the RT-880 uses 128 (one bank, which lives wholly in the 64 KB EEPROM image) so the whole codeplug sits in a
+// single high-flash region with no 1 MB "flash" image to place.
+#ifndef CODEPLUG_CHANNELS_MAX
 #define CODEPLUG_CHANNELS_MAX	1024
+#endif
 #define CODEPLUG_ZONES_MAX	68
 
 // Bumped on every change (edits, and codeplug_reload after the CPS wrote the image)

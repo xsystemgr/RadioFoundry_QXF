@@ -239,13 +239,20 @@ static void filter_type(char key)
 
 // --- Recent: every call heard and made, newest first ---
 
-static ui_recent_t recent[UI_RECENT_MAX];
-static uint8_t recent_n;
+static uint8_t recent_n;		// always 0 on an analog build (nothing fills the list)
 static uint32_t recent_seen_ms;
 static bool recent_tx;
+#if CONFIG_DMR
+static ui_recent_t recent[UI_RECENT_MAX];
 
 uint8_t ui_recent_count(void) { return recent_n; }
 const ui_recent_t *ui_recent_get(uint8_t i) { return i < recent_n ? &recent[i] : NULL; }
+#else
+// Analog-only build: "Recent" is a DMR concept (heard digital calls), so the 480-byte list buffer is left out
+// entirely. The accessors stay (ui_nav.h declares them, callers loop over them) but report an empty list.
+uint8_t ui_recent_count(void) { return 0; }
+const ui_recent_t *ui_recent_get(uint8_t i) { (void)i; return NULL; }
+#endif
 
 #if CONFIG_DMR
 static void recent_add(const ui_recent_t *r)
@@ -426,13 +433,13 @@ static bool caller_target(ui_target_t *t)
 		t->saved = t->name[0] != 0;
 		return true;
 	}
-#endif
 	for (uint8_t i = 0; i < recent_n; i++) {
 		if (!recent[i].out) {
 			ui_recent_target(&recent[i], t);
 			return true;
 		}
 	}
+#endif
 	return false;
 }
 

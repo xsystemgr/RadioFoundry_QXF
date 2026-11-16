@@ -104,6 +104,10 @@ int gfx_pill(const font_t *f, int x, int y, int h, const char *s, color_t fg, co
 
 // Send the rows that changed since the last flush (compared by a hash per row) to the display
 void gfx_flush(void);
+// Render a frame: call draw() to paint the frame buffer and push it to the panel. In banded builds (GFX_BAND_ROWS) it
+// re-runs draw() once per horizontal band, so only a band of the screen is kept in RAM. draw() must repaint the whole
+// frame from state (every screen clears first), so it can be called more than once per frame.
+void gfx_render(void (*draw)(void));
 // Freeze the frame buffer for a screen capture: the UI skips redraws until ms (hal_millis) or gfx_hold(0)
 void gfx_hold(uint32_t until_ms);
 bool gfx_held(uint32_t now_ms);

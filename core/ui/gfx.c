@@ -4,9 +4,30 @@
 #include <string.h>
 #include "gfx.h"
 
-static uint32_t fb_words[GFX_FB_BYTES / 4];
+// GFX_BAND_ROWS lets a RAM-tight board keep only a horizontal band of the frame in memory instead of the whole screen:
+// the UI is a full redraw of state each frame (ui.c), so gfx_render() re-runs the draw once per band, clipped to that
+// band, and flushes each band to the panel. 0 (the default, every other board) keeps the classic full-screen buffer
+// with its cross-frame dirty-row skip. Banded mode trades a little CPU (the draw runs once per band) for ~70% of the
+// framebuffer RAM. It cannot coexist with the webctl mirror, which needs the whole frame at once.
+#ifndef GFX_BAND_ROWS
+#define GFX_BAND_ROWS 0
+#endif
+#if GFX_BAND_ROWS && CONFIG_NET_WEBCTL
+#error "GFX_BAND_ROWS cannot be combined with CONFIG_NET_WEBCTL"
+#endif
+#if GFX_BAND_ROWS
+#define GFX_FB_WORDS ((((GFX_FB_BYTES / GFX_MAX_ROWS) * (GFX_BAND_ROWS)) + 3u) / 4u)
+#else
+#define GFX_FB_WORDS (GFX_FB_BYTES / 4u)
+#endif
+static uint32_t fb_words[GFX_FB_WORDS];
 static const hal_display_t *display;
 static int width, height, bpp, stride;	// stride in bytes
+static int band_top;		// panel row held at fb_words row 0 (0 in full-screen mode)
+static int band_rows;		// rows the buffer holds (= height in full-screen mode, GFX_BAND_ROWS when banded)
+// The frame buffer row holding panel row y. In full-screen mode band_top is 0, so this is the plain fb_words + y*stride.
+static inline uint8_t *fb_row(int y) { return (uint8_t *)fb_words + (y - band_top) * stride; }
+static inline bool in_band(int y) { return y >= band_top && y < band_top + band_rows; }
 static int clip_x0, clip_y0, clip_x1, clip_y1;	// panel coordinates, x1, y1 exclusive
 // The viewport (the board's safe area): every drawing call takes coordinates relative to it
 static int ox, oy, vw, vh;
@@ -132,8 +153,14 @@ bool gfx_init(const hal_display_t *disp)
 	height = disp->height;
 	bpp = disp->bpp;
 	stride = bpp == 1 ? (width + 7) / 8 : bpp == 4 ? (width + 1) / 2 : width * 2;
+#if GFX_BAND_ROWS
+	band_rows = GFX_BAND_ROWS;		// the buffer holds one band; gfx_render walks the screen band by band
+#else
+	band_rows = height;			// classic: the buffer is the whole screen
+#endif
+	band_top = 0;
 	if ((bpp != 1 && bpp != 16 && (bpp != 4 || !GFX_INDEXED || disp->flush_indexed == NULL)) ||
-	    (uint32_t)stride * (uint32_t)height > GFX_FB_BYTES || height > (int)GFX_MAX_ROWS) {
+	    (uint32_t)stride * (uint32_t)band_rows > sizeof fb_words || height > (int)GFX_MAX_ROWS) {
 		width = height = 0;
 		display = NULL;
 		return false;
@@ -180,7 +207,9 @@ void gfx_clip_off(void)
 // Fill a span of one row, already clipped
 static void span(int x0, int x1, int y, color_t c)
 {
-	uint8_t *row = (uint8_t *)fb_words + y * stride;
+	if (!in_band(y))		// outside the band currently in the buffer (always in range in full-screen mode)
+		return;
+	uint8_t *row = fb_row(y);
 	if (bpp == 16) {
 		uint16_t *p = (uint16_t *)row + x0;
 		for (int x = x0; x < x1; x++)
@@ -205,7 +234,9 @@ static void span(int x0, int x1, int y, color_t c)
 // A panel pixel, already clipped: RGB565 (0 / 1 at bpp 1)
 static color_t raw_pixel(int x, int y)
 {
-	const uint8_t *row = (const uint8_t *)fb_words + y * stride;
+	if (!in_band(y))		// a read outside the band (e.g. an AA blend at the edge): treat as blank
+		return 0;
+	const uint8_t *row = fb_row(y);
 	if (bpp == 16)
 		return ((const uint16_t *)row)[x];
 #if GFX_INDEXED
@@ -224,10 +255,12 @@ static void edge_pixel(int x, int y, color_t fg, unsigned a)
 			span(x, x + 1, y, fg);
 		return;
 	}
+	if (!in_band(y))
+		return;
 	color_t c = blend(fg, raw_pixel(x, y), a);
 #if GFX_INDEXED
 	if (bpp == 4) {
-		put4((uint8_t *)fb_words + y * stride, x, pal_index_blend(c));
+		put4(fb_row(y), x, pal_index_blend(c));
 		return;
 	}
 #endif
@@ -284,11 +317,11 @@ void gfx_clear(color_t c)
 #if GFX_INDEXED
 	if (bpp == 4) {		// nothing drawn before is left: the palette starts over with c
 		pal_reset(c);
-		memset(fb_words, 0, (size_t)stride * (size_t)height);
+		memset(fb_words, 0, (size_t)stride * (size_t)band_rows);
 		return;
 	}
 #endif
-	for (int y = 0; y < height; y++)	// the whole panel, margins included
+	for (int y = band_top; y < band_top + band_rows; y++)	// the whole panel (band), margins included
 		span(0, width, y, c);
 }
 
@@ -618,7 +651,7 @@ int gfx_pill(const font_t *f, int x, int y, int h, const char *s, color_t fg, co
 
 static uint32_t hash_row(int y)
 {
-	const uint8_t *p = (const uint8_t *)fb_words + y * stride;
+	const uint8_t *p = fb_row(y);
 	uint32_t h = 2166136261u;	// FNV-1a
 	for (int i = 0; i < stride; i++)
 		h = (h ^ p[i]) * 16777619u;
@@ -627,13 +660,17 @@ static uint32_t hash_row(int y)
 
 static void send(int y0, int y1)
 {
+	// The display driver indexes the buffer by absolute panel row (fb + y*stride). In banded mode the buffer holds
+	// only rows [band_top, band_top+band_rows), so offset the base by -band_top*stride; the driver then reads
+	// fb_row(y) for y in [y0,y1), always inside the buffer. In full-screen mode band_top is 0 and base == fb_words.
+	const void *base = (const uint8_t *)fb_words - (size_t)band_top * (size_t)stride;
 #if GFX_INDEXED
 	if (bpp == 4) {
-		display->flush_indexed(fb_words, pal_sent, (uint16_t)y0, (uint16_t)y1);
+		display->flush_indexed(base, pal_sent, (uint16_t)y0, (uint16_t)y1);
 		return;
 	}
 #endif
-	display->flush(fb_words, (uint16_t)y0, (uint16_t)y1);
+	display->flush(base, (uint16_t)y0, (uint16_t)y1);
 }
 
 void gfx_flush(void)
@@ -670,6 +707,35 @@ void gfx_flush(void)
 	all_dirty = false;
 #if CONFIG_NET_WEBCTL
 	frames_done = frames_begun;
+#endif
+}
+
+// Render one frame: run draw() to fill the frame buffer and send it to the panel. In full-screen mode this is the
+// classic one-shot draw + flush. In banded mode it walks the screen band by band, re-running the (state-driven) draw
+// clipped to each band and flushing it, so only one band lives in RAM at a time. draw() must repaint the whole frame
+// from state each time it is called (every RadioFoundry screen starts with gfx_clear), which it already does.
+void gfx_render(void (*draw)(void))
+{
+	if (display == NULL)
+		return;
+#if GFX_BAND_ROWS
+	for (band_top = 0; band_top < height; band_top += band_rows) {
+		int y1 = band_top + band_rows < height ? band_top + band_rows : height;
+		gfx_clip_off();
+		draw();			// a full redraw; in_band() keeps only this band's rows in the buffer
+#if GFX_INDEXED
+		if (bpp == 4) {		// this band built its own palette; hand the panel that palette
+			memcpy(pal_sent, pal, sizeof pal);
+			pal_n_sent = pal_n;
+		}
+#endif
+		send(band_top, y1);
+	}
+	band_top = 0;
+#else
+	gfx_frame_begin();
+	draw();
+	gfx_flush();
 #endif
 }
 

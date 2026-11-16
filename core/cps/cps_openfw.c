@@ -570,8 +570,164 @@ static int needed(void)
 	}
 }
 
+// --- D: structured codeplug service (our own extension; open-firmware-cps leaves 'D' for host data services) ---
+// A clean channel/zone API for the RadioFoundry web CPS: fixed records in and out, so the host never has to understand
+// the on-flash open-firmware byte layout or drive the sector journal itself - it just sends and receives whole channels
+// and zones, and the firmware's codeplug layer does the rest (and refuses to write unless the region is free). All
+// multi-byte fields are little-endian. Sub-commands: 0 info, 1 read ch, 2 write ch, 5 delete ch, 3 read zone, 4 write
+// zone, 6 delete zone. Channel/zone indices are 1-based channel numbers / 0-based zone indices.
+#define D_REC 40u		// channel record size
+static void le16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
+static uint16_t ule16(const uint8_t *p) { return (uint16_t)(p[0] | ((uint16_t)p[1] << 8)); }
+static void le32(uint8_t *p, uint32_t v) { p[0]=(uint8_t)v; p[1]=(uint8_t)(v>>8); p[2]=(uint8_t)(v>>16); p[3]=(uint8_t)(v>>24); }
+static uint32_t ule32(const uint8_t *p) { return (uint32_t)p[0] | ((uint32_t)p[1]<<8) | ((uint32_t)p[2]<<16) | ((uint32_t)p[3]<<24); }
+
+static void chan_to_rec(const channel_t *c, uint8_t *r)
+{
+	memset(r, 0, D_REC);
+	memcpy(r, c->name, CODEPLUG_NAME_LEN + 1u);		// 17 bytes, already null-terminated
+	le32(r + 17, c->rx_hz);
+	le32(r + 21, c->tx_hz);
+	r[25] = c->bw == RADIO_BW_25K ? 1u : 0u;
+	r[26] = c->power;
+	r[27] = (uint8_t)((c->rx_only ? 1u : 0u) | (c->scan_skip ? 2u : 0u) | (c->vox ? 4u : 0u) |
+			  (c->mode == RADIO_MODE_AM ? 8u : 0u));
+	r[28] = c->rx_tone.type;
+	le16(r + 29, c->rx_tone.value);
+	r[31] = c->tx_tone.type;
+	le16(r + 32, c->tx_tone.value);
+}
+
+static void rec_to_chan(const uint8_t *r, channel_t *c)
+{
+	memset(c, 0, sizeof(*c));
+	memcpy(c->name, r, CODEPLUG_NAME_LEN);
+	c->name[CODEPLUG_NAME_LEN] = 0;
+	c->rx_hz = ule32(r + 17);
+	c->tx_hz = ule32(r + 21);
+	c->bw = r[25] ? RADIO_BW_25K : RADIO_BW_12K5;
+	c->power = r[26];
+	c->rx_only = (r[27] & 1u) != 0;
+	c->scan_skip = (r[27] & 2u) != 0;
+	c->vox = (r[27] & 4u) != 0;
+	c->mode = (r[27] & 8u) ? RADIO_MODE_AM : RADIO_MODE_FM;
+	c->rx_tone.type = r[28];
+	c->rx_tone.value = ule16(r + 29);
+	c->tx_tone.type = r[31];
+	c->tx_tone.value = ule16(r + 32);
+	c->timeslot = 1;		// harmless defaults for the DMR fields an analog host leaves out
+}
+
+static void cmd_data(void)
+{
+	uint8_t sub = req_len > 1 ? req[1] : 0;
+	uint8_t out[5u + 18u + 2u * CODEPLUG_ZONE_MAX];		// large enough for the biggest reply (a full zone)
+	out[0] = 'D';
+	out[1] = sub;
+	switch (sub) {
+	case 0:							// info
+		le16(out + 2, codeplug_channel_count());
+		le16(out + 4, codeplug_zone_count());
+		le16(out + 6, (uint16_t)CODEPLUG_CHANNELS_MAX);
+		out[8] = (uint8_t)D_REC;
+		out[9] = (uint8_t)codeplug_source();		// 0 none, 1 built-in, 2 stored (open-firmware)
+		send(out, 10);
+		break;
+	case 1: {						// read channel: D 1 <num:2>
+		uint16_t n = req_len >= 4 ? ule16(&req[2]) : 0;
+		channel_t c;
+		le16(out + 2, n);
+		bool present = n >= 1 && codeplug_channel(n, &c);
+		out[4] = present ? 1u : 0u;
+		if (present)
+			chan_to_rec(&c, out + 5);
+		else
+			memset(out + 5, 0, D_REC);
+		send(out, 5u + D_REC);
+		break;
+	}
+	case 2: {						// write channel: D 2 <num:2> <rec:40>
+		uint16_t n = req_len >= 4 ? ule16(&req[2]) : 0;
+		bool ok = n >= 1 && req_len >= 4u + D_REC;
+		if (ok) {
+			channel_t c;
+			rec_to_chan(&req[4], &c);
+			ok = codeplug_set_channel(n, &c);
+		}
+		le16(out + 2, n);
+		out[4] = ok ? 1u : 0u;
+		send(out, 5);
+		break;
+	}
+	case 5: {						// delete channel: D 5 <num:2>
+		uint16_t n = req_len >= 4 ? ule16(&req[2]) : 0;
+		bool ok = n >= 1 && codeplug_delete_channel(n);
+		le16(out + 2, n);
+		out[4] = ok ? 1u : 0u;
+		send(out, 5);
+		break;
+	}
+	case 3: {						// read zone: D 3 <index:2>
+		uint16_t idx = req_len >= 4 ? ule16(&req[2]) : 0;
+		zone_t z;
+		le16(out + 2, idx);
+		bool present = codeplug_zone(idx, &z);
+		out[4] = present ? 1u : 0u;
+		memset(out + 5, 0, CODEPLUG_NAME_LEN + 1u);
+		uint16_t cnt = 0;
+		if (present) {
+			memcpy(out + 5, z.name, CODEPLUG_NAME_LEN + 1u);
+			cnt = z.count > CODEPLUG_ZONE_MAX ? CODEPLUG_ZONE_MAX : z.count;
+		}
+		out[5u + CODEPLUG_NAME_LEN + 1u] = (uint8_t)cnt;
+		for (uint16_t i = 0; i < cnt; i++)
+			le16(out + 5u + CODEPLUG_NAME_LEN + 2u + i * 2u, z.channels[i]);
+		send(out, 5u + CODEPLUG_NAME_LEN + 2u + (size_t)cnt * 2u);
+		break;
+	}
+	case 4: {						// write zone: D 4 <index:2> <name:17> <count:1> <ch:2*count>
+		uint16_t idx = req_len >= 4 ? ule16(&req[2]) : 0;
+		bool ok = req_len >= 4u + CODEPLUG_NAME_LEN + 2u;
+		if (ok) {
+			zone_t z;
+			memset(&z, 0, sizeof(z));
+			memcpy(z.name, &req[4], CODEPLUG_NAME_LEN);
+			z.name[CODEPLUG_NAME_LEN] = 0;
+			uint16_t cnt = req[4u + CODEPLUG_NAME_LEN + 1u];
+			if (cnt > CODEPLUG_ZONE_MAX)
+				cnt = CODEPLUG_ZONE_MAX;
+			if (req_len >= 4u + CODEPLUG_NAME_LEN + 2u + (size_t)cnt * 2u) {
+				z.count = cnt;
+				for (uint16_t i = 0; i < cnt; i++)
+					z.channels[i] = ule16(&req[4u + CODEPLUG_NAME_LEN + 2u + i * 2u]);
+				ok = codeplug_set_zone(idx, &z);
+			} else {
+				ok = false;
+			}
+		}
+		le16(out + 2, idx);
+		out[4] = ok ? 1u : 0u;
+		send(out, 5);
+		break;
+	}
+	case 6: {						// delete zone: D 6 <index:2>
+		uint16_t idx = req_len >= 4 ? ule16(&req[2]) : 0;
+		bool ok = codeplug_delete_zone(idx);
+		le16(out + 2, idx);
+		out[4] = ok ? 1u : 0u;
+		send(out, 5);
+		break;
+	}
+	default:
+		out[2] = 0;					// unknown sub-command: "failed"
+		send(out, 3);
+		break;
+	}
+}
+
 static void handle(size_t n)
 {
+	(void)n;
 	stats.requests++;
 	stats.last = req[0];
 	stats.session = true;
@@ -586,11 +742,9 @@ static void handle(size_t n)
 	case 'C':
 		cmd_control();
 		break;
-	case 'D': {
-		uint8_t r[3] = { 'D', n > 1 ? req[1] : 0, 0 };	// "failed": no data service on this radio yet
-		send(r, sizeof(r));
+	case 'D':
+		cmd_data();
 		break;
-	}
 	default:
 		refuse();
 		break;

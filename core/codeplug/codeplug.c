@@ -641,6 +641,28 @@ bool codeplug_zone(uint16_t index, zone_t *out)
 
 // --- Editing ---
 
+#ifndef CODEPLUG_ADOPT_BLANK_ONLY
+#define CODEPLUG_ADOPT_BLANK_ONLY 0
+#endif
+#if CODEPLUG_ADOPT_BLANK_ONLY
+// Refuse to adopt (erase + write) a codeplug region that isn't blank. A board whose codeplug region sits in a flash
+// area that might still hold the vendor's own data (the RT-880 reserves no dedicated region) sets this: the first write
+// then happens only when the whole EEPROM image reads 0xFF, so stored vendor data - the codeplug or the RF calibration
+// - can never be erased. A blank region writes normally; a non-blank one keeps channels in RAM (edits just won't persist).
+static bool adopt_region_blank(void)
+{
+	uint8_t b[64];
+	for (uint32_t off = 0; off < 0x10000u; off += sizeof(b)) {	// the 64 KB EEPROM image holds bank 0 + the zones
+		if (!flash_read(ee_base + off, b, sizeof(b)))
+			return false;
+		for (unsigned i = 0; i < sizeof(b); i++)
+			if (b[i] != 0xFFu)
+				return false;
+	}
+	return true;
+}
+#endif
+
 // A codeplug to edit: the built-in set first becomes a stored one (its channels written, the bitmaps, zones and
 // lists that may hold junk from other firmware cleared)
 static bool materialize(void)
@@ -651,6 +673,11 @@ static bool materialize(void)
 	if (source != CODEPLUG_BUILTIN || !storage_ready()) {
 		return false;
 	}
+#if CODEPLUG_ADOPT_BLANK_ONLY
+	if (!adopt_region_blank()) {
+		return false;	// the region isn't free - never erase what may be the stock codeplug / calibration
+	}
+#endif
 	static const uint8_t zero[32];
 	bool ok = true;
 	for (unsigned bank = 0; bank < CH_BANKS && ok; bank++) {

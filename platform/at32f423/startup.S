@@ -9,9 +9,17 @@
 .word _estack, Reset_Handler, Default_Handler, Default_Handler
 .word Default_Handler, Default_Handler, Default_Handler, 0, 0, 0, 0
 .word SVC_Handler, Default_Handler, 0, PendSV_Handler, SysTick_Handler
-.rept 128
+.rept 71
 .word Default_Handler
 .endr
+.word USART6_IRQHandler		@ external IRQ 71 (USART6 receive - the CPS / host-link port)
+.rept 56
+.word Default_Handler
+.endr
+
+// USART6_IRQHandler is defined in boards/rt880/serial_rt880.c (always compiled for this board) with
+// __attribute__((used)). No weak .thumb_set alias here on purpose: under LTO that alias wins over the real C handler
+// and the receive interrupt silently runs Default_Handler.
 
 .section .text.Reset_Handler,"ax",%progbits
 .global Reset_Handler

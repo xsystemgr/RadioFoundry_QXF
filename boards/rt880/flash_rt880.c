@@ -142,13 +142,20 @@ static bool rt880_flash_erase(uint32_t addr)
 	return wait_ready();
 }
 
-// Settings ring + journal placed high in the 4 MB device, away from the stock's low codeplug/calibration. No
-// open-firmware images, no calibration window, no native codeplug in flash (channels stay on defaults in RAM), no
-// staging - so nothing here can clobber channels or the stock calibration.
+// Everything is placed HIGH in the 4 MB device, away from the stock's low codeplug/calibration. The 64 KB codeplug
+// EEPROM image sits just below the settings ring (0x3E0000..0x3EFFFF). Channels are capped to 128 (one open-firmware
+// bank, CODEPLUG_CHANNELS_MAX), which lives entirely inside that EEPROM image, so there is no separate 1 MB "flash"
+// image to place. Safety: the vendor reserved no region for us, so this address might still hold stock data. The core
+// only ever adopts (erases + writes) this region when it reads entirely 0xFF (CODEPLUG_ADOPT_BLANK_ONLY), so a stored
+// codeplug or the RF calibration can never be clobbered - at worst channel edits simply won't persist until a free
+// region is confirmed. settings/journal keep their own foreign-detection on top of that.
 static const hal_flash_map_t map = {
 	.settings_addr = 0x3F0000u,	// 8 sectors (32 KB) for the settings ring
 	.settings_size = 0x008000u,
 	.journal_addr  = 0x3F8000u,	// 2 sectors for the sector journal
+	.openfw_eeprom = 0x3E0000u,	// 64 KB codeplug EEPROM image (bank 0 channels + zones), blank on a stock radio
+	.openfw_flash  = 0x3E0000u,	// no separate flash image (channels capped to bank 0); kept in range, never written
+	.openfw_end    = 0x3F0000u,	// the open-firmware CPS may write only below here - never into settings/journal
 };
 
 const hal_flash_t rt880_flash = {

@@ -86,6 +86,11 @@ void ui_get_status(ui_app_status_t *st)
 		st->query = "";
 }
 
+// gfx_render takes a plain draw callback (so it can re-run it per band); the splash carries arguments, so stage them
+// here and paint through a wrapper.
+static const char *splash_name, *splash_ver, *splash_l1, *splash_l2;
+static void draw_splash_cb(void) { ui_draw_splash(splash_name, splash_ver, splash_l1, splash_l2); }
+
 static void ui_task(void *arg)
 {
 	(void)arg;
@@ -97,8 +102,11 @@ static void ui_task(void *arg)
 		char line1[17], line2[17];
 		ui_svc_boot_text(line1, line2);
 		// the release name when this is one (v26.11), else the commit
-		ui_draw_splash(board.name, RFOUNDRY_RELEASE[0] != '\0' ? RFOUNDRY_RELEASE : RFOUNDRY_GIT, line1, line2);
-		gfx_flush();
+		splash_name = board.name;
+		splash_ver = RFOUNDRY_RELEASE[0] != '\0' ? RFOUNDRY_RELEASE : RFOUNDRY_GIT;
+		splash_l1 = line1;
+		splash_l2 = line2;
+		gfx_render(draw_splash_cb);
 	}
 	ui_app_init();
 	set_backlight(ui_app_brightness());
@@ -139,9 +147,7 @@ static void ui_task(void *arg)
 		if (dirty && have_fb && now - last_draw >= FRAME_MIN_MS && !gfx_held(now)) {
 			dirty = false;
 			last_draw = now;
-			gfx_frame_begin();
-			ui_app_draw();
-			gfx_flush();
+			gfx_render(ui_app_draw);
 		} else if (!have_fb) {
 			dirty = false;
 		}

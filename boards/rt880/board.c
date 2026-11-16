@@ -192,6 +192,9 @@ static const keymap_entry_t keys[] = {
 };
 
 extern const hal_flash_t rt880_flash;	// boards/rt880/flash_rt880.c (W25Q32 SPI NOR, bit-banged)
+#if CONFIG_HOSTLINK
+extern const hal_stream_t rt880_host_stream;	// boards/rt880/serial_rt880.c (USART6 host link for CPS)
+#endif
 // Battery sense: the stock firmware reads it on ADC1 ORDINARY SEQUENCE 1 = channel 7 (PA7) - confirmed by reverse-
 // engineering the factory image (adc_ordinary_channel_set(ADC1, 7, 1, ...) feeding DMA buffer[0], then V = raw*3/51+2
 // in tenths of a volt). The divider (BATT -> ~300K -> PA7 -> ~47K -> GND) gives Vbatt = Vadc * 347/47; a full 2S pack
@@ -265,7 +268,14 @@ static uint8_t battery_pct(void)
 }
 static int8_t volume(void) { return -1; }
 static bool switch_on(void) { return true; }
-static void led(uint8_t which, bool on) { (void)which; (void)on; }
+// Bi-color status LED D500: green = PA13 (PDA/RX-CLGLED, via R533), red = PA14 (PCK/TX-RLED, via R534); both active
+// high (the pin sources through the resistor into the LED to GND). These pins default to SWDIO/SWCLK (the J500 SWD
+// programming header) - driving them as GPIO at runtime is fine; SWD still works under reset for flashing. The core's
+// radio state machine calls this with LED_GREEN (RX/busy) and LED_RED (TX).
+static void led(uint8_t which, bool on)
+{
+	at32_pin_output(AT32_GPIO_A, which == LED_RED ? 14u : 13u, on);
+}
 static const hal_power_t power = {
 	.init = nothing, .latch = ignore_bool, .battery_mv = battery_mv, .battery_pct = battery_pct,
 	.volume = volume, .switch_on = switch_on, .led = led,
@@ -431,6 +441,9 @@ const board_t board = {
 	.bands = bands, .band_count = sizeof(bands) / sizeof(bands[0]), .power_count = 2, .power_names = power_names,
 	.display = &display, .input = &input, .keymap = keys, .keymap_len = sizeof(keys) / sizeof(keys[0]),
 	.radio = &rt880_radio, .power = &power, .flash = &rt880_flash, .diag_line = diag,
+#if CONFIG_HOSTLINK
+	.host_port = &rt880_host_stream,	// USART6 on the accessory FPC (boards/rt880/serial_rt880.c): CPS / host link
+#endif
 #if CONFIG_BCAST_FM
 	.bcast = &si4732_hal,
 #endif

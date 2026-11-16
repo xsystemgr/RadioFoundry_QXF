@@ -3759,7 +3759,13 @@ static bool tool_shown(uint16_t i)
 	if (i == T_ZONE_OFFER)
 		return offer_waiting();	// 0 on the keypad: only while another radio's zone waits
 #endif
+	// A tool whose underlying feature isn't built is left out of the list entirely (not shown dimmed): on an analog-only
+	// radio that drops Hotspot, USB network, Single-freq repeater and Roaming (all DMR), plus Position/APRS where the
+	// board has no GPS/APRS. Only tools that actually do something on this build remain.
 	return (i != T_DIAG || CONFIG_DIAG) && (i != T_BATTERY || board_volts() != BOARD_VOLTS_NONE) &&
+	       (i != T_HOTSPOT || CONFIG_HOTSPOT) && (i != T_USB_NET || USB_NET_UI) &&
+	       (i != T_SFR || CONFIG_SFR) && (i != T_ROAM || CONFIG_DMR_ROAMING) &&
+	       (i != T_POSITION || CONFIG_GPS) && (i != T_APRS || CONFIG_APRS) &&
 	       i != T_ZONE_OFFER;
 }
 

@@ -9,7 +9,7 @@
 # so their objects (compiled with different CONFIG_BCAST_FM) never clobber each other.
 ifeq ($(HF),1)
 BUILD := build/rt880-lab-hf
-RT880_FEATURES := FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN CHANNEL_LIST AM_RX BCAST_FM FONT_AA
+RT880_FEATURES := FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN CHANNEL_LIST AM_RX BCAST_FM FONT_AA DUAL_WATCH HOSTLINK CPS_OPENFW
 TARGET := $(BUILD)/rfoundry_rt880_HF_si4732_UNTESTED
 # The Si4732 keeps 0.15-24 MHz (AM/SW); 24-30 MHz (CB/10 m) is left to the BK4819 for narrowband FM (see route()).
 # CONFIG_SI4732_SSB pulls in the SSB patch (ham voice on HF; third-party patch, personal use - see si4732_ssb_patch.h).
@@ -22,7 +22,7 @@ TARGET := $(BUILD)/rfoundry_rt880_HF_ANTPROBE_UNTESTED
 endif
 else
 BUILD := build/rt880-lab
-RT880_FEATURES := FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN CHANNEL_LIST AM_RX BCAST_FM DUAL_WATCH
+RT880_FEATURES := FM VFO VFO_FM DIAG UI_COLOR UI_SETTINGS SCAN CHANNEL_LIST AM_RX BCAST_FM DUAL_WATCH HOSTLINK CPS_OPENFW
 TARGET := $(BUILD)/rfoundry_rt880_rx_speaker_fix5_UNTESTED
 HF_DEFS :=
 endif
@@ -41,12 +41,23 @@ DIRS := core/app core/radio core/ui core/input core/codeplug core/settings core/
 ifeq ($(CONFIG_BCAST_FM),y)
 DIRS += drivers/bcast/si4732 drivers/bus/i2c_gpio
 endif
+# The host link + CPS (codeplug programming) over the USART6 accessory serial (boards/rt880/serial_rt880.c). The host
+# link adds a task, whose stack comes from the RTOS heap; the band-rendered framebuffer freed the RAM to grow the heap
+# so it fits (12 KB is full with the base tasks). Only the host-link builds pay this - the default image stays at 12 KB.
+ifeq ($(CONFIG_HOSTLINK),y)
+DIRS += core/hostlink core/cps
+HOSTLINK_DEFS := -DconfigTOTAL_HEAP_SIZE=15360
+endif
 # The build tag shown on the Home status strip (RFOUNDRY_GIT) so the operator can tell which image is flashed. Bump it
 # each lab build; a diagnostic variant below overrides it with its own name. Override on the command line: RT880_VER=v7.
 RT880_VER ?= v5-mic
-# MSG=1: the GOGUFW-compatible analog messenger (BK4819 FSK). Build on the lean HF base: make HF=1 MSG=1 image
-ifeq ($(MSG),1)
+# The GOGUFW-compatible analog messenger (BK4819 FSK) is a default analog feature now: the "Messages" hub entry opens
+# it. Band-rendering freed the RAM for it to ride along in the normal Lite build. Disable with MSG=0; MSG=1 only renames
+# the image so an explicit messenger build is easy to tell apart.
+ifneq ($(MSG),0)
 DIRS += core/messenger
+endif
+ifeq ($(MSG),1)
 TARGET := $(BUILD)/rfoundry_rt880_MSG_UNTESTED
 endif
 # MIC_PROBE=1: a no-RF bench diagnostic. Runs the mic ADC on both BK4819 with the PA off and the antenna unrouted, so
@@ -79,10 +90,12 @@ RTOS := third_party/FreeRTOS-Kernel
 SRC += $(addprefix $(RTOS)/,tasks.c queue.c list.c timers.c event_groups.c portable/GCC/ARM_CM4F/port.c portable/MemMang/heap_4.c)
 OBJ := $(addprefix $(BUILD)/,$(SRC:.c=.o)) $(BUILD)/platform/at32f423/startup.o
 CPU := -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
-DEFS := $(FEATURE_DEFS) $(HF_DEFS) -DGFX_INDEXED=1 -DGFX_FB_BYTES=9600u -DGFX_MAX_ROWS=160u \
-	-DCONFIG_MESSENGER=$(if $(filter 1,$(MSG)),1,0) \
+DEFS := $(FEATURE_DEFS) $(HF_DEFS) $(HOSTLINK_DEFS) -DGFX_INDEXED=1 -DGFX_FB_BYTES=9600u -DGFX_MAX_ROWS=160u -DGFX_BAND_ROWS=20 \
+	-DCONFIG_MESSENGER=$(if $(filter 0,$(MSG)),0,1) \
 	-DRFOUNDRY_BOARD_ID=\"rt880-lab\" -DRFOUNDRY_GIT=\"$(RT880_VER)\" \
-	$(if $(RT880_PA_BIAS),-DRT880_PA_BIAS=$(RT880_PA_BIAS),)
+	-DCODEPLUG_CHANNELS_MAX=128 -DCODEPLUG_ADOPT_BLANK_ONLY=1 \
+	$(if $(RT880_PA_BIAS),-DRT880_PA_BIAS=$(RT880_PA_BIAS),) $(if $(RT880_UART_SWEEP),-DRT880_UART_SWEEP,) $(if $(RT880_UART_ECHO),-DRT880_UART_ECHO,) \
+	$(if $(LNA_FIND),-DRT880_LNA_FIND,)
 INC := -Ihal -Icore -Idrivers -Iboards/rt880 -Iplatform/at32f423 -I$(BUILD)/gen -I$(RTOS)/include -I$(RTOS)/portable/GCC/ARM_CM4F
 CFLAGS := $(CPU) -Os -g3 -std=gnu11 -ffunction-sections -fdata-sections -fno-common -flto=auto -fcallgraph-info=su -MMD -MP \
 	-Wall -Wextra -Wshadow -Wno-unused-parameter $(DEFS) $(INC)
@@ -118,6 +131,14 @@ test:
 	cc -std=c11 -Wall -Wextra -Werror -DCONFIG_BCAST_FM=0 -Ihal -Icore -Idrivers -Iplatform/at32f423 \
 		boards/rt880/radio.c drivers/rf/bk4819/bk4819.c drivers/rf/subaudio/subaudio.c boards/rt880/tests/radio_test.c -o $(BUILD)/radio-test
 	$(BUILD)/radio-test
+	# Band-rendering must reconstruct the same frame as the full-screen buffer: build gfx both ways and diff the dumps.
+	cc -std=c11 -Wall -Wextra -Werror -DGFX_INDEXED=1 -DGFX_FB_BYTES=9600u -DGFX_MAX_ROWS=160u -DCONFIG_NET_WEBCTL=0 \
+		-DCONFIG_FONT_AA=1 -DGFX_BAND_ROWS=0 -Ihal -Icore -Icore/ui core/ui/gfx.c boards/rt880/tests/gfx_band_test.c -o $(BUILD)/gfx-full
+	cc -std=c11 -Wall -Wextra -Werror -DGFX_INDEXED=1 -DGFX_FB_BYTES=9600u -DGFX_MAX_ROWS=160u -DCONFIG_NET_WEBCTL=0 \
+		-DCONFIG_FONT_AA=1 -DGFX_BAND_ROWS=20 -Ihal -Icore -Icore/ui core/ui/gfx.c boards/rt880/tests/gfx_band_test.c -o $(BUILD)/gfx-band
+	$(BUILD)/gfx-full > $(BUILD)/gfx-full.txt
+	$(BUILD)/gfx-band > $(BUILD)/gfx-band.txt
+	cmp $(BUILD)/gfx-full.txt $(BUILD)/gfx-band.txt && echo "gfx band-render test: banded output matches full-screen"
 # The Si4732 HF driver and its bit-banged I2C transport, host-side with a mock chip.
 test-hf:
 	@mkdir -p $(BUILD)

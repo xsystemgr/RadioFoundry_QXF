@@ -198,9 +198,11 @@ int main(void)
 		if (!valid)
 			assert(!rt880_radio.rx(hz, RADIO_BW_25K, NULL));
 	}
+	assert(gpio_writes == before);		// an out-of-band RX never drives the front-end GPIO
+	// A channel with a CTCSS/DCS sub-tone now TUNES and arms the BK4819 tone detector (status() then gates audio on
+	// the tone), where an earlier build refused it outright.
 	subtone_t tone = { .type = TONE_CTCSS, .value = 885 };
-	assert(!rt880_radio.rx(145500000, RADIO_BW_25K, &tone));
-	assert(gpio_writes == before);
+	assert(rt880_radio.rx(145500000, RADIO_BW_25K, &tone));
 	// TX: allowed in the VHF/UHF ham ranges, refused in the air band and out of band.
 	assert(rt880_radio.rx(145500000, RADIO_BW_25K, NULL));
 	// Voice and FSK both transmit on bus_b (receiver = chips[1]) = schematic chip "A", whose MICP pin carries the

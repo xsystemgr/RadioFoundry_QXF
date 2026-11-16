@@ -401,10 +401,28 @@ static bool do_tune(uint32_t hz, radio_bw_t bw, bool am)
 #endif
 	return true;
 }
+// Our subtone_t.type and bk4819_tone_t share the same order (NONE/CTCSS/DCS/DCS_INV), but map explicitly rather than
+// cast, so a future reorder can't break it silently.
+static bk4819_tone_t bk_tone(const subtone_t *t)
+{
+	if (t == NULL) return BK4819_TONE_NONE;
+	return t->type == TONE_CTCSS ? BK4819_TONE_CTCSS
+	     : t->type == TONE_DCS ? BK4819_TONE_DCS
+	     : t->type == TONE_DCS_INV ? BK4819_TONE_DCS_INV : BK4819_TONE_NONE;
+}
+
+static subtone_t rx_subtone;	// the tuned channel's CTCSS/DCS, so status() can gate audio on the tone (tone squelch)
+
 static bool receive(uint32_t hz, radio_bw_t bw, const subtone_t *tone)
 {
-	if (tone != NULL && tone->type != TONE_NONE) return false; // FM sub-audio not handled here
-	return do_tune(hz, bw, false);
+	rx_subtone = tone != NULL ? *tone : (subtone_t){ TONE_NONE, 0 };
+	if (!do_tune(hz, bw, false))
+		return false;
+	// FM sub-audio RX: set up the BK4819 CTCSS/DCS detector (value = Hz x 10 for CTCSS, the octal code for DCS, as
+	// subtone_t carries them). status() reads the "tone found" bit and reports tone_ok, and the core mutes the speaker
+	// until the matching tone is heard. A plain (no-tone) channel clears the detector and always opens.
+	bk4819_set_rx_tone(&receiver, bk_tone(tone), tone != NULL ? tone->value : 0);
+	return true;
 }
 #if CONFIG_AM_RX
 static bool rx_am(uint32_t hz, radio_bw_t bw)
@@ -418,15 +436,26 @@ static bool rx_am(uint32_t hz, radio_bw_t bw)
 // the PA was "on" but radiated nothing (confirmed on hardware: TX stored to Sent yet no carrier). These are deliberately
 // conservative lab bias levels, well under full scale (0xFF high byte). Transmit into a proper antenna or dummy load.
 // The PA bias (REG 0x36 high byte). The stock forms it as (powerval & 0x3F) << 2, with powerval ~0x29-0x37 at full
-// power (~4-5 W). For the low-power RF-desense test this is set well below that and trimmed to the measured output via
-// the build define RT880_PA_BIAS (e.g. make ... RT880_PA_BIAS=0x30), so an exact 500 mW can be dialled in once measured.
-#ifndef RT880_PA_BIAS
-#define RT880_PA_BIAS 0x30u
+// power (~4-5 W). The board advertises two levels ("LO"/"HI", power index 0/1 from the channel) and this maps each to
+// a bias byte. Both are tunable at build time (RT880_PA_BIAS_LO / RT880_PA_BIAS_HI, or RT880_PA_BIAS to force a single
+// level for a bench test). HI defaults near the stock's full-scale bias; trim it to the measured output. The exact
+// watts depend on the per-band calibration the stock keeps in flash, which we do not read - so measure into a dummy
+// load / antenna and adjust. Never key without a proper 50 ohm load: an unterminated PA at HI bias can be damaged.
+#ifdef RT880_PA_BIAS
+#define RT880_PA_BIAS_LO (RT880_PA_BIAS)
+#define RT880_PA_BIAS_HI (RT880_PA_BIAS)
+#endif
+#ifndef RT880_PA_BIAS_LO
+#define RT880_PA_BIAS_LO 0x30u		// low power (~hundreds of mW, as set for the bench)
+#endif
+#ifndef RT880_PA_BIAS_HI
+#define RT880_PA_BIAS_HI 0xC0u		// high power - strong, near the stock full-scale bias; trim to measured output
 #endif
 static uint16_t tx_pa_word(uint8_t power)
 {
-	(void)power;					// single low-power level for the bench test
-	return (uint16_t)(((uint16_t)(RT880_PA_BIAS) << 8) | 0xFFu);	// bias in the high byte, enable + gain in the low
+	// power is the board power-level index (0 = LO, 1 = HI); anything >=1 selects HI.
+	uint16_t bias = power >= 1u ? (uint16_t)RT880_PA_BIAS_HI : (uint16_t)RT880_PA_BIAS_LO;
+	return (uint16_t)((bias << 8) | 0xFFu);		// bias in the high byte, enable + gain in the low
 }
 static bool transmit(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
 {
@@ -497,6 +526,13 @@ static bool transmit(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t 
 		// went silent). On-air the owner picked 0x3800 as the good level.
 		bk4819_write(tx, 0x40, 0x3800);
 		bk4819_write(tx, BK4819_REG_TX_AUDIO, 0x3B20);	// 0x50 = 0x3B20: nicFW's live-mic source value
+		if (tt != BK4819_TONE_NONE) {
+			// The nicFW voice base rewrote 0x51 (to 0x9100) and 0x40 (to 0x3800), wiping the sub-audio that
+			// bk4819_tx_prepare() set earlier - so re-assert it LAST, after the voice registers. The mic stays live
+			// (0x50 unchanged) and the CTCSS/DCS sub-tone now rides under the voice, so a repeater that needs a tone
+			// opens and the far end's tone squelch hears us. 0x40 drops to the stock tone-TX deviation (headroom).
+			bk4819_tx_prepare(tx, tt, tv);
+		}
 		bk4819_write(tx, BK4819_REG_PA, tx_pa_word(power));
 		bk4819_set_freq(tx, hz);
 		bk4819_write(tx, BK4819_REG_POWER, BK4819_POWER_ON);
@@ -729,7 +765,7 @@ static void status(radio_status_t *value)
 	uint16_t raw = bk4819_read(&receiver, BK4819_REG_RSSI);
 	value->rssi_dbm = bk4819_rssi_dbm(raw);
 	value->noise = (uint8_t)(bk4819_read(&receiver, BK4819_REG_NOISE) & 0x7Fu);
-	value->tone_ok = true;
+	value->tone_ok = bk4819_rx_tone_ok(&receiver, bk_tone(&rx_subtone));	// CTCSS/DCS gate (always true with no tone)
 	last_rssi = value->rssi_dbm;
 	last_noise = value->noise;
 	voice_level = bk4819_read(&receiver, 0x64);
@@ -791,10 +827,54 @@ bool rt880_rf_diag(uint8_t line, char *buf, uint8_t len)
 			 (unsigned)(j >> 16) & 0xFFu, (unsigned)(j >> 8) & 0xFFu, (unsigned)j & 0xFFu);
 		break;
 	}
-#ifdef RT880_PIN_FINDER
+// The Diagnostics screen stops at the first line that returns false, so a bench finder has to start right after the
+// always-present line 10. RT880_PIN_FINDER and RT880_LNA_FIND are separate diagnostic images; don't combine them.
+#if defined(RT880_PIN_FINDER) && !defined(RT880_LNA_FIND)
 	case 11: snprintf(buf, len, "A:%04X B:%04X", at32_port_inputs(AT32_GPIO_A), at32_port_inputs(AT32_GPIO_B)); break;
 	case 12: snprintf(buf, len, "C:%04X D:%04X", at32_port_inputs(AT32_GPIO_C), at32_port_inputs(AT32_GPIO_D)); break;
 	case 13: snprintf(buf, len, "F:%04X (press PTT)", at32_port_inputs(AT32_GPIO_F)); break;
+#endif
+#ifdef RT880_LNA_FIND
+	case 11: {
+		// LNA / preamp finder. The RX is ~30 dB deaf (audio log: "Absolute RSSI ~30 dB low"), which points at an
+		// external front-end preamp the stock enables and we don't. Every ~3 s this drives the NEXT candidate
+		// front-end control and shows the live RSSI: tune a steady weak station and watch for the RSSI (and audio)
+		// to jump - the label shown at that moment is the preamp's enable. "base" restores our normal state.
+		// Candidates: the three known front-end-select MCU pins driven HIGH, three spare nearby pins, and extra bits
+		// OR'd into the receiver's REG 0x33 (the BK4819 front-end GPIO byte) - a common place for an on-chip LNA gate.
+		static const struct { const char *name; uint8_t port, pin; uint16_t r33; } cand[] = {
+			{ "base", 0xFF, 0, 0 },
+			{ "PC15=1", AT32_GPIO_C, 15, 0 }, { "PB11=1", AT32_GPIO_B, 11, 0 }, { "PF0=1", AT32_GPIO_F, 0, 0 },
+			{ "PC14=1", AT32_GPIO_C, 14, 0 }, { "PC13=1", AT32_GPIO_C, 13, 0 }, { "PB10=1", AT32_GPIO_B, 10, 0 },
+			{ "33|01", 0xFF, 0, 0x01 }, { "33|02", 0xFF, 0, 0x02 }, { "33|04", 0xFF, 0, 0x04 },
+			{ "33|08", 0xFF, 0, 0x08 }, { "33|3F", 0xFF, 0, 0x3F },
+		};
+		enum { N = (int)(sizeof(cand) / sizeof(cand[0])) };
+		static uint8_t idx;
+		static uint32_t last_ms;
+		uint32_t now = hal_millis();
+		if (now - last_ms > 3000u || last_ms == 0) {
+			last_ms = now;
+			idx = (uint8_t)((idx + 1u) % N);
+			// Restore our baseline first: the three front-end selects back to init (LOW outputs), the spares back to
+			// floating inputs, and REG 0x33 back to route() for the tuned band.
+			at32_pin_output(AT32_GPIO_C, 15, false);
+			at32_pin_output(AT32_GPIO_B, 11, false);
+			at32_pin_output(AT32_GPIO_F, 0, false);
+			at32_pin_input_floating(AT32_GPIO_C, 14);
+			at32_pin_input_floating(AT32_GPIO_C, 13);
+			at32_pin_input_floating(AT32_GPIO_B, 10);
+			if (started) bk4819_write(&receiver, 0x33, route(frequency));
+			// Apply this candidate.
+			if (cand[idx].port != 0xFF) {
+				at32_pin_output(cand[idx].port, cand[idx].pin, true);
+			} else if (cand[idx].r33 && started) {
+				bk4819_write(&receiver, 0x33, (uint16_t)(route(frequency) | cand[idx].r33));
+			}
+		}
+		snprintf(buf, len, "LNA %s R:%d", cand[idx].name, last_rssi);
+		break;
+	}
 #endif
 	default: return false;
 	}

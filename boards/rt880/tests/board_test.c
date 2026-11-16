@@ -7,6 +7,10 @@
 #include "../radio.h"
 #include "input/input_engine.h"
 
+// The real host-link stream (serial_rt880.c) is register-level USART6 code that can't run on the host; the board
+// struct references it under CONFIG_HOSTLINK (on by default in config.h), so provide an inert stand-in here.
+const hal_stream_t rt880_host_stream = { 0 };
+
 static unsigned writes;
 static unsigned active_row = 99;
 static unsigned pressed = 99;
