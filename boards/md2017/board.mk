@@ -12,7 +12,7 @@ MD2017_DEFS ?=
 MCU_DEFS   += -DUVF_MD2017=1 $(MD2017_DEFS)
 BOARD_DIRS := boards/md2017 boards/uv380_family platform/stm32f4/hrc platform/stm32f4/spi_flash platform/stm32f4/fsmc_keypad \
 	drivers/rf/at1846s drivers/rf/subaudio drivers/modem/hrc6000 drivers/modem/hrc_common drivers/display/st7735 \
-	drivers/flash/spi_nor drivers/input/quadrature
+	drivers/flash/spi_nor drivers/input/quadrature core/nxdn
 # The HAL's I2C driver besides the platform's modules
 BOARD_HAL_MODULES := hal_i2c
 # The 160x128 panel in 16 colors, every row visible (as the family's, unconfirmed on this radio)
